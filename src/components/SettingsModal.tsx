@@ -23,6 +23,7 @@ interface SettingsModalProps {
   onRestoreBackup: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onResetSeeds: () => void;
   onOpenTutorial: () => void;
+  onRerunWizard?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -34,6 +35,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onRestoreBackup,
   onResetSeeds,
   onOpenTutorial,
+  onRerunWizard,
 }) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'data' | 'shortcuts'>('profile');
   const [name, setName] = useState(settings.studentName);
@@ -164,14 +166,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               <div className="pt-2 flex items-center justify-between border-t border-white/[0.08]">
-                <button
-                  type="button"
-                  onClick={onOpenTutorial}
-                  className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 font-medium btn-tactile"
-                >
-                  <GraduationCap className="w-3.5 h-3.5" />
-                  <span>Launch Welcome Tour</span>
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={onOpenTutorial}
+                    className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 font-medium btn-tactile"
+                  >
+                    <GraduationCap className="w-3.5 h-3.5" />
+                    <span>App Tour</span>
+                  </button>
+                  {onRerunWizard && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onRerunWizard();
+                      }}
+                      className="flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 font-medium btn-tactile"
+                    >
+                      <User className="w-3.5 h-3.5" />
+                      <span>Re-run Setup Wizard</span>
+                    </button>
+                  )}
+                </div>
 
                 <button
                   type="submit"

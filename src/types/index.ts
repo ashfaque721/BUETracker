@@ -151,5 +151,6 @@ export interface UserSettings {
   totalDegreeCredits: number;
   currentSemesterId: string;
   theme: 'dark' | 'light' | 'buet';
+  isOnboarded?: boolean;
 }
 

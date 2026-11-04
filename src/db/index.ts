@@ -25,6 +25,7 @@ export const SEED_SETTINGS: UserSettings = {
   totalDegreeCredits: 160,
   currentSemesterId: 'L2T1',
   theme: 'dark',
+  isOnboarded: true,
 };
 
 export const SEED_COURSES: Course[] = [
@@ -667,22 +668,10 @@ export const SEED_ROUTINE: RoutineMetadata = {
   ],
 };
 
-// Initial database seeding if empty
+// Database initialization (Never force dummy data on first launch)
 export async function initializeDatabase(): Promise<void> {
-  const courseCount = await db.courses.count();
-  if (courseCount === 0) {
-    await db.courses.bulkAdd(SEED_COURSES);
-  }
-
-  const routineCount = await db.routines.count();
-  if (routineCount === 0) {
-    await db.routines.add(SEED_ROUTINE);
-  }
-
-  const settingsCount = await db.settings.count();
-  if (settingsCount === 0) {
-    await db.settings.add({ id: 'primary_settings', ...SEED_SETTINGS });
-  }
+  // Fresh launches start blank and prompt the student through the Onboarding Wizard.
+  // Sample seed data is only populated if the user explicitly requests it.
 }
 
 // Full Database Export and Import

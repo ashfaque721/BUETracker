@@ -20,6 +20,7 @@ import { CourseManager } from './components/CourseManager';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { WelcomeTutorialModal } from './components/WelcomeTutorialModal';
 import { SettingsModal } from './components/SettingsModal';
+import { StudentSetupWizard } from './components/StudentSetupWizard';
 import { calculateGPA } from './utils/buetOrdinance';
 import {
   Calendar,
@@ -29,23 +30,33 @@ import {
   Settings,
   Sparkles,
   GraduationCap,
-  PlusCircle,
   Play,
-  RotateCcw,
-  Layers,
   ArrowRight,
 } from 'lucide-react';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'routine' | 'assessment' | 'courses' | 'analytics'>('routine');
   const [courses, setCourses] = useState<Course[]>([]);
-  const [routine, setRoutine] = useState<RoutineMetadata>(SEED_ROUTINE);
-  const [settings, setSettings] = useState<UserSettings>(SEED_SETTINGS);
+  const [routine, setRoutine] = useState<RoutineMetadata>({
+    id: 'initial_routine',
+    title: 'Class Routine of Section A',
+    subTitle: 'Level-1 Term-1 | BUET',
+    effectiveDate: 'November 2026',
+    slots: [],
+  });
+  const [settings, setSettings] = useState<UserSettings>({
+    studentName: '',
+    studentId: '',
+    department: 'Industrial & Production Engineering (IPE)',
+    totalDegreeCredits: 160,
+    currentSemesterId: 'L1T1',
+    theme: 'dark',
+    isOnboarded: false,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
-  const [dismissedWelcomeCard, setDismissedWelcomeCard] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -62,14 +73,22 @@ export function App() {
       const allRoutines = await db.routines.toArray();
       const allSettings = await db.settings.toArray();
 
-      if (allCourses.length > 0) setCourses(allCourses);
-      if (allRoutines.length > 0) setRoutine(allRoutines[0]);
-      if (allSettings.length > 0) setSettings(allSettings[0]);
-
-      // Check if welcome tutorial should be shown on launch
-      const hideWelcome = localStorage.getItem('buetracker_hide_welcome');
-      if (!hideWelcome) {
-        setShowTutorial(true);
+      if (allSettings.length > 0 && allSettings[0].isOnboarded) {
+        setSettings(allSettings[0]);
+        if (allCourses.length > 0) setCourses(allCourses);
+        if (allRoutines.length > 0) setRoutine(allRoutines[0]);
+      } else {
+        // Not onboarded yet: do not inject dummy data!
+        setSettings({
+          studentName: '',
+          studentId: '',
+          department: 'Industrial & Production Engineering (IPE)',
+          totalDegreeCredits: 160,
+          currentSemesterId: 'L1T1',
+          theme: 'dark',
+          isOnboarded: false,
+        });
+        setCourses([]);
       }
     } catch (err) {
       console.error('Failed to load DB:', err);
@@ -117,6 +136,46 @@ export function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [routine, courses]);
 
+  // First-Run Wizard Completion Handler
+  const handleCompleteSetup = async (
+    newSettings: UserSettings,
+    initialCourses: Course[],
+    initialRoutine: RoutineMetadata
+  ) => {
+    await db.transaction('rw', db.courses, db.routines, db.settings, async () => {
+      await db.courses.clear();
+      await db.routines.clear();
+      await db.settings.clear();
+
+      if (initialCourses.length > 0) {
+        await db.courses.bulkAdd(initialCourses);
+      }
+      await db.routines.add(initialRoutine);
+      await db.settings.add({ id: 'primary_settings', ...newSettings });
+    });
+
+    setSettings(newSettings);
+    setCourses(initialCourses);
+    setRoutine(initialRoutine);
+    showToast(`Welcome, ${newSettings.studentName.split(' ')[0]}! Your workspace is ready.`);
+  };
+
+  // Explicit demo sample load (only if user asks for it)
+  const handleLoadSampleRoutine = async () => {
+    await db.transaction('rw', db.courses, db.routines, db.settings, async () => {
+      await db.courses.clear();
+      await db.routines.clear();
+      await db.settings.clear();
+      await db.courses.bulkAdd(SEED_COURSES);
+      await db.routines.add(SEED_ROUTINE);
+      await db.settings.add({ id: 'primary_settings', ...SEED_SETTINGS });
+    });
+    setCourses(SEED_COURSES);
+    setRoutine(SEED_ROUTINE);
+    setSettings(SEED_SETTINGS);
+    showToast('Loaded BUET Level-2 Term-1 Sample Routine & Courses');
+  };
+
   // CRUD Handlers for Courses
   const handleAddCourse = async (course: Course) => {
     await db.courses.add(course);
@@ -152,39 +211,6 @@ export function App() {
     await db.settings.put({ id: 'primary_settings', ...updated });
     setSettings(updated);
     showToast('Student settings updated');
-  };
-
-  // Load Sample IPE Routine & Courses (Beginner Friendly)
-  const handleLoadSampleRoutine = async () => {
-    await db.courses.clear();
-    await db.routines.clear();
-    await db.settings.clear();
-    await db.courses.bulkAdd(SEED_COURSES);
-    await db.routines.add(SEED_ROUTINE);
-    await db.settings.add({ id: 'primary_settings', ...SEED_SETTINGS });
-    setCourses(SEED_COURSES);
-    setRoutine(SEED_ROUTINE);
-    setSettings(SEED_SETTINGS);
-    setDismissedWelcomeCard(true);
-    showToast('Loaded BUET Level-2 Term-1 Sample Routine & Courses');
-  };
-
-  // Start Blank (Clear everything)
-  const handleStartBlank = async () => {
-    await db.courses.clear();
-    await db.routines.clear();
-    const blankRoutine: RoutineMetadata = {
-      id: 'blank_routine',
-      title: 'Class Routine of Section A',
-      subTitle: 'Level-2 Term-1 | BUET',
-      effectiveDate: 'November 2026',
-      slots: [],
-    };
-    await db.routines.add(blankRoutine);
-    setCourses([]);
-    setRoutine(blankRoutine);
-    setDismissedWelcomeCard(true);
-    showToast('Started blank workspace');
   };
 
   // Backup & Restore
@@ -231,12 +257,10 @@ export function App() {
     completedCourses.map((c) => ({ credits: c.credits, gradePoint: c.gradePoint }))
   );
 
-  const isBrandNewWorkspace = courses.length === 0 && routine.slots.length === 0 && !dismissedWelcomeCard;
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center text-white space-y-4">
-        <div className="w-11 h-11 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center text-red-500 font-bold text-sm tracking-tight animate-pulse shadow-xl">
+        <div className="w-11 h-11 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center text-emerald-400 font-bold text-sm tracking-tight animate-pulse shadow-xl">
           BU
         </div>
         <p className="text-xs text-zinc-400 font-medium">Starting BUETracker...</p>
@@ -244,8 +268,18 @@ export function App() {
     );
   }
 
+  // FIRST RUN: If user is NOT onboarded, show the dedicated StudentSetupWizard!
+  if (!settings.isOnboarded) {
+    return (
+      <StudentSetupWizard
+        onCompleteSetup={handleCompleteSetup}
+        onLoadSampleDemo={handleLoadSampleRoutine}
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#09090b] text-zinc-300 flex flex-col font-sans selection:bg-red-950 selection:text-red-200">
+    <div className="min-h-screen bg-[#09090b] text-zinc-300 flex flex-col font-sans selection:bg-emerald-950 selection:text-emerald-200">
       {/* Sleek, Single-Row 56px Executive Header */}
       <header className="sticky top-0 z-40 bg-[#09090b]/95 backdrop-blur-md border-b border-white/[0.08] no-print">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
@@ -253,7 +287,7 @@ export function App() {
           <div className="flex items-center gap-3">
             <div
               onClick={() => setShowTutorial(true)}
-              className="w-8 h-8 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 flex items-center justify-center text-red-400 font-bold text-xs tracking-tight cursor-pointer transition shadow-sm btn-tactile"
+              className="w-8 h-8 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 flex items-center justify-center text-emerald-400 font-bold text-xs tracking-tight cursor-pointer transition shadow-sm btn-tactile"
               title="Open Guided Interactive Tour"
             >
               BU
@@ -261,7 +295,7 @@ export function App() {
 
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold tracking-tight text-zinc-100">
-                BUE<span className="text-red-500">Tracker</span>
+                BUE<span className="text-emerald-500">Tracker</span>
               </span>
               <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded-md bg-zinc-900 text-[10px] text-zinc-400 font-mono tabular-nums border border-white/[0.08]">
                 {settings.currentSemesterId}
@@ -269,7 +303,7 @@ export function App() {
             </div>
           </div>
 
-          {/* Center: Tactile Segmented Navigation Bar with smooth active sliding pill */}
+          {/* Center: Tactile Segmented Navigation Bar */}
           <nav className="flex items-center p-1 rounded-xl bg-zinc-900/90 border border-white/[0.08] relative">
             <button
               onClick={() => setActiveTab('routine')}
@@ -329,9 +363,11 @@ export function App() {
               title="Click to view Student Profile & Settings"
             >
               <div className="w-5 h-5 rounded-full bg-zinc-800 text-zinc-200 font-bold text-[10px] flex items-center justify-center border border-white/10">
-                {settings.studentName.charAt(0)}
+                {settings.studentName ? settings.studentName.charAt(0) : 'U'}
               </div>
-              <span className="text-zinc-300 font-medium">{settings.studentName.split(' ')[0]}</span>
+              <span className="text-zinc-300 font-medium">
+                {settings.studentName ? settings.studentName.split(' ')[0] : 'Student'}
+              </span>
               <span className="text-zinc-600">•</span>
               <div className="flex items-center gap-1.5 text-emerald-400 font-mono tabular-nums font-semibold">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -345,7 +381,7 @@ export function App() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-white/10 text-xs font-medium shadow-xs transition btn-tactile"
               title="Launch Guided App Tour"
             >
-              <GraduationCap className="w-3.5 h-3.5 text-red-400" />
+              <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
               <span className="hidden sm:inline">Tour</span>
             </button>
 
@@ -364,50 +400,13 @@ export function App() {
       {/* Floating Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-5 right-5 z-50 bg-zinc-900 border border-white/12 text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs font-medium animate-slide-up no-print">
-          <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+          <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Main Workspace */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 animate-fade-in">
-        {/* Beginner-Friendly Zero-Friction First Run Card */}
-        {isBrandNewWorkspace && (
-          <div className="surface-card p-6 sm:p-8 mb-6 border-emerald-500/30 bg-gradient-to-br from-zinc-900 via-zinc-900 to-emerald-950/20 animate-fade-in">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/60 text-[11px] font-semibold">
-                  <Sparkles className="w-3 h-3" />
-                  <span>Beginner Setup</span>
-                </div>
-                <h2 className="text-lg sm:text-xl font-semibold tracking-tight text-zinc-100">
-                  Welcome to your Semester Workspace
-                </h2>
-                <p className="text-sm text-zinc-300 max-w-2xl leading-relaxed">
-                  Track your Saturday–Wednesday classes, calculate your CT best-n scores, and see the exact exam marks needed for an A+.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3 shrink-0">
-                <button
-                  onClick={handleLoadSampleRoutine}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-950/50 transition btn-tactile"
-                >
-                  <Play className="w-3.5 h-3.5 fill-white" />
-                  <span>Load Sample IPE Routine</span>
-                </button>
-
-                <button
-                  onClick={handleStartBlank}
-                  className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium border border-white/10 transition btn-tactile"
-                >
-                  Start Blank
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Tab 1: Routine Designer */}
         {activeTab === 'routine' && (
           <RoutineDesigner
@@ -415,7 +414,6 @@ export function App() {
             courses={courses}
             onUpdateRoutine={handleUpdateRoutine}
             onLoadSampleRoutine={handleLoadSampleRoutine}
-            onStartBlank={handleStartBlank}
           />
         )}
 
@@ -497,6 +495,9 @@ export function App() {
         onOpenTutorial={() => {
           setShowSettingsModal(false);
           setShowTutorial(true);
+        }}
+        onRerunWizard={() => {
+          setSettings({ ...settings, isOnboarded: false });
         }}
       />
     </div>
