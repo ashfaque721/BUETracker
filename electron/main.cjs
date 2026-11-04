@@ -5,7 +5,9 @@ const fs = require('fs');
 let mainWindow = null;
 
 function createWindow() {
-  const iconPath = path.join(__dirname, '../public/icon.png');
+  const iconIco = path.join(__dirname, '../public/icon.ico');
+  const iconPng = path.join(__dirname, '../public/icon.png');
+  const appIcon = fs.existsSync(iconIco) ? iconIco : (fs.existsSync(iconPng) ? iconPng : undefined);
 
   mainWindow = new BrowserWindow({
     width: 1360,
@@ -13,7 +15,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 700,
     title: 'BUETracker - BUET Academic Suite',
-    icon: fs.existsSync(iconPath) ? iconPath : undefined,
+    icon: appIcon,
     backgroundColor: '#020617',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
