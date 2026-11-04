@@ -26,4 +26,6 @@ dist-ssr
 # Build outputs & packages
 release
 *.exe
+*.traineddata
+*.tmp
 

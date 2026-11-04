@@ -10,7 +10,9 @@ import {
   parseBIISText,
   convertParsedCourseToAppCourse,
   BIISParseResult,
+  ParsedBIISCourse,
 } from '../utils/biisParser';
+import { BIISScreenshotScanner } from './BIISScreenshotScanner';
 import { calculateGPA } from '../utils/buetOrdinance';
 import {
   BookOpen,
@@ -24,6 +26,7 @@ import {
   GraduationCap,
   FileText,
   AlertCircle,
+  Camera,
 } from 'lucide-react';
 
 interface CourseManagerProps {
@@ -116,17 +119,12 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
     setParseResult(result);
   };
 
-  const handleImportParsedCourses = () => {
-    if (!parseResult || parseResult.courses.length === 0) return;
-
-    const appCourses = parseResult.courses.map((parsed) =>
+  const handleImportScannedCourses = (scannedCourses: ParsedBIISCourse[]) => {
+    const appCourses = scannedCourses.map((parsed) =>
       convertParsedCourseToAppCourse(parsed, activeSemesterId, isOngoingSemester)
     );
-
     onBulkAddCourses(appCourses);
-    setParseResult(null);
-    setBiisRawText('');
-    setUploadedImagePreview(null);
+    setActiveTab('manual');
   };
 
   const handleLoadSampleBIIS = () => {
@@ -215,13 +213,14 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
           </button>
           <button
             onClick={() => setActiveTab('biis')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition btn-tactile ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition btn-tactile ${
               activeTab === 'biis'
                 ? 'bg-zinc-800 text-zinc-100 shadow-xs border border-white/10'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            BIIS Result Sheet Ingestion
+            <Camera className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Scan Result Screenshot</span>
           </button>
         </div>
 
@@ -469,116 +468,32 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
         </div>
       )}
 
-      {/* TAB 2: BIIS Grade Sheet Ingestion */}
+      {/* TAB 2: BIIS Grade Sheet Screenshot Scanner */}
       {activeTab === 'biis' && (
-        <div className="surface-card p-6 space-y-5 animate-fade-in text-xs">
+        <div className="surface-card p-6 space-y-4 animate-fade-in text-xs">
           <div>
-            <h3 className="font-semibold tracking-tight text-zinc-100 text-sm">
-              BIIS Grade Sheet Auto-Parser ({activeSemester.label})
+            <h3 className="font-semibold tracking-tight text-zinc-100 text-sm flex items-center gap-2">
+              <Camera className="w-4 h-4 text-emerald-400" />
+              <span>BIIS Grade Sheet Screenshot Scanner ({activeSemester.label})</span>
             </h3>
             <p className="text-zinc-400 text-xs mt-0.5 leading-relaxed">
-              Copy-paste the text directly from your official BUET BIIS Result Sheet or drop a screenshot to parse course codes, credits, and GPAs automatically.
+              No need to copy-paste boring text. Just take a screenshot of your result on{' '}
+              <span className="text-emerald-400 font-mono">biis.buet.ac.bd</span> (
+              <kbd className="px-1 py-0.5 rounded bg-zinc-800 text-[10px] font-mono text-zinc-300">
+                Win + Shift + S
+              </kbd>
+              ) and press{' '}
+              <kbd className="px-1 py-0.5 rounded bg-zinc-800 text-[10px] font-mono text-emerald-300 font-bold">
+                Ctrl + V
+              </kbd>{' '}
+              right here!
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Left: Input Options */}
-            <div className="space-y-3">
-              {/* Dropzone */}
-              <label className="border-2 border-dashed border-white/12 hover:border-emerald-500/50 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition bg-zinc-900/50">
-                <UploadCloud className="w-8 h-8 text-emerald-400" />
-                <span className="font-semibold text-zinc-200 text-sm">Drop BIIS Screenshot / Result Slip</span>
-                <span className="text-xs text-zinc-400 text-center leading-relaxed">
-                  Supports PNG, JPG, or PDF snippets (Auto-extracts sample courses)
-                </span>
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-              </label>
-
-              {/* Text Paste Box */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-zinc-400 font-medium">Or Paste Raw BIIS Text</label>
-                  <button
-                    onClick={handleLoadSampleBIIS}
-                    className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold"
-                  >
-                    Load BUET L2T1 Sample Sheet
-                  </button>
-                </div>
-                <textarea
-                  rows={6}
-                  value={biisRawText}
-                  onChange={(e) => {
-                    setBiisRawText(e.target.value);
-                    handleParseBIIS(e.target.value);
-                  }}
-                  placeholder="Paste Course No, Course Title, Credit, Grade, Grade Point here..."
-                  className="w-full bg-zinc-900 border border-white/[0.08] rounded-xl p-3 text-zinc-100 font-mono tabular-nums text-xs focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-            </div>
-
-            {/* Right: Parsed Preview */}
-            <div className="space-y-3">
-              <div className="font-semibold text-zinc-200 flex items-center justify-between text-xs">
-                <span>Parsed Course Preview</span>
-                {parseResult && (
-                  <span className="text-emerald-400 font-mono tabular-nums text-xs">
-                    {parseResult.courses.length} courses identified
-                  </span>
-                )}
-              </div>
-
-              {parseResult && parseResult.courses.length > 0 ? (
-                <div className="border border-white/[0.08] rounded-2xl overflow-hidden bg-zinc-900">
-                  <table className="w-full text-xs text-left">
-                    <thead>
-                      <tr className="border-b border-white/[0.08] text-zinc-400 font-semibold text-[11px] bg-zinc-800/40">
-                        <th className="p-2.5">Code</th>
-                        <th className="p-2.5">Title</th>
-                        <th className="p-2.5 text-center">Credits</th>
-                        <th className="p-2.5 text-center">Grade</th>
-                        <th className="p-2.5 text-right">Point</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/[0.04] font-mono tabular-nums">
-                      {parseResult.courses.map((p, i) => (
-                        <tr key={i}>
-                          <td className="p-2.5 font-bold text-zinc-100">{p.code}</td>
-                          <td className="p-2.5 text-zinc-300 font-sans truncate max-w-[140px]">{p.title}</td>
-                          <td className="p-2.5 text-center">{p.credits.toFixed(2)}</td>
-                          <td className="p-2.5 text-center font-bold text-emerald-400">{p.grade}</td>
-                          <td className="p-2.5 text-right font-bold text-zinc-100">{p.gradePoint.toFixed(2)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  <div className="p-3 bg-zinc-950 border-t border-white/[0.08] flex items-center justify-between">
-                    <span className="text-xs text-zinc-400 font-medium">
-                      Target: {activeSemester.label}
-                    </span>
-                    <button
-                      onClick={handleImportParsedCourses}
-                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md transition btn-tactile"
-                    >
-                      Commit {parseResult.courses.length} Courses to Database
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="h-56 rounded-2xl border border-dashed border-white/[0.08] flex flex-col items-center justify-center p-6 text-center text-zinc-500">
-                  <Clipboard className="w-8 h-8 text-zinc-600 mb-2" />
-                  <p>Paste text or click 'Load BUET L2T1 Sample Sheet' to preview parsed courses here.</p>
-                </div>
-              )}
-            </div>
-          </div>
+          <BIISScreenshotScanner
+            targetSemesterLabel={activeSemester.label}
+            onConfirmCourses={(courses) => handleImportScannedCourses(courses)}
+          />
         </div>
       )}
     </div>

@@ -5,7 +5,8 @@ import {
   RoutineMetadata,
   UserSettings,
 } from '../types';
-import { parseBIISText, convertParsedCourseToAppCourse, BIISParseResult } from '../utils/biisParser';
+import { convertParsedCourseToAppCourse, ParsedBIISCourse } from '../utils/biisParser';
+import { BIISScreenshotScanner } from './BIISScreenshotScanner';
 import {
   GraduationCap,
   Calendar,
@@ -20,6 +21,8 @@ import {
   FileText,
   User,
   ShieldCheck,
+  Camera,
+  Calculator,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -50,10 +53,10 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
   const [routineSection, setRoutineSection] = useState('Section A');
   const [l1t1Template, setL1t1Template] = useState<'standard' | 'blank'>('standard');
 
-  // Step 2 (For Not L1T1): Previous Grade Sheet Ingestion
-  const [ingestMethod, setIngestMethod] = useState<'biis_paste' | 'quick_gpa' | 'skip'>('biis_paste');
-  const [biisRawText, setBiisRawText] = useState('');
-  const [parseResult, setParseResult] = useState<BIISParseResult | null>(null);
+  // Step 2 (For Not L1T1): Previous Grade Sheet Ingestion via Screenshot OCR
+  const [ingestMethod, setIngestMethod] = useState<'screenshot' | 'quick_gpa' | 'skip'>('screenshot');
+  const [confirmedCourses, setConfirmedCourses] = useState<ParsedBIISCourse[]>([]);
+  const [scanSummary, setScanSummary] = useState<{ termGpa?: number; totalCredits?: number }>({});
   const [quickCgpa, setQuickCgpa] = useState('3.75');
   const [quickCredits, setQuickCredits] = useState('38.0');
 
@@ -89,30 +92,6 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
     const deptShort = department === 'Other (Custom)' ? (customDept || 'Engineering') : department.split('(')[1]?.replace(')', '') || 'Dept';
     setRoutineTitle(`Class Routine of ${deptShort} ${selectedSemester.shortLabel} Section A`);
     setStep(2);
-  };
-
-  const handleParseBIIS = () => {
-    if (!biisRawText.trim()) return;
-    const result = parseBIISText(biisRawText);
-    setParseResult(result);
-  };
-
-  const handleLoadSampleBIIS = () => {
-    const sample = `Bangladesh University of Engineering and Technology
-Result Sheet - Term Examination
-Student ID: ${studentId || '2308001'}   Name: ${name || 'BUET Student'}
-Course No    Course Title                                      Credit    Grade    Grade Point
-MATH 191     Differential and Integral Calculus                3.00      A+       4.00
-PHY 109      Physics I (Heat, Waves and Optics)                3.00      A        3.75
-CHEM 109     Chemistry I                                       3.00      A+       4.00
-HUM 101      English and Economics                             3.00      A-       3.50
-ME 160       Mechanical Engineering Drawing-I                  1.50      A+       4.00
-PHY 102      Physics Sessional                                 0.75      A+       4.00
-CHEM 114     Inorganic Quantitative Analysis Sessional         0.75      A+       4.00`;
-
-    setBiisRawText(sample);
-    const result = parseBIISText(sample);
-    setParseResult(result);
   };
 
   const handleFinalizeSetup = () => {
@@ -201,11 +180,10 @@ CHEM 114     Inorganic Quantitative Analysis Sessional         0.75      A+     
         ];
       }
     } else {
-      // Non-freshman: Ingest parsed previous courses
-      if (ingestMethod === 'biis_paste' && parseResult && parseResult.courses.length > 0) {
-        // Target previous semester ID (or default to L1T1 if only one previous term)
+      // Non-freshman: Ingest courses detected from Screenshot OCR
+      if (ingestMethod === 'screenshot' && confirmedCourses.length > 0) {
         const targetPrevSemId = previousSemesters[0]?.id || 'L1T1';
-        initialCourses = parseResult.courses.map((parsed) =>
+        initialCourses = confirmedCourses.map((parsed) =>
           convertParsedCourseToAppCourse(parsed, targetPrevSemId, false)
         );
       }
@@ -501,79 +479,51 @@ CHEM 114     Inorganic Quantitative Analysis Sessional         0.75      A+     
             <div className="flex border-b border-white/[0.08]">
               <button
                 type="button"
-                onClick={() => setIngestMethod('biis_paste')}
-                className={`py-2 px-3 text-xs font-semibold border-b-2 transition btn-tactile ${
-                  ingestMethod === 'biis_paste'
+                onClick={() => setIngestMethod('screenshot')}
+                className={`flex items-center gap-1.5 py-2 px-3 text-xs font-semibold border-b-2 transition btn-tactile ${
+                  ingestMethod === 'screenshot'
                     ? 'border-emerald-500 text-white'
                     : 'border-transparent text-zinc-400 hover:text-zinc-200'
                 }`}
               >
-                Paste BIIS Sheet
+                <Camera className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Scan Screenshot (OCR)</span>
               </button>
               <button
                 type="button"
                 onClick={() => setIngestMethod('quick_gpa')}
-                className={`py-2 px-3 text-xs font-semibold border-b-2 transition btn-tactile ${
+                className={`flex items-center gap-1.5 py-2 px-3 text-xs font-semibold border-b-2 transition btn-tactile ${
                   ingestMethod === 'quick_gpa'
                     ? 'border-emerald-500 text-white'
                     : 'border-transparent text-zinc-400 hover:text-zinc-200'
                 }`}
               >
-                Quick CGPA Entry
+                <Calculator className="w-3.5 h-3.5 text-blue-400" />
+                <span>Quick CGPA Entry</span>
               </button>
               <button
                 type="button"
                 onClick={() => setIngestMethod('skip')}
-                className={`py-2 px-3 text-xs font-semibold border-b-2 transition btn-tactile ${
+                className={`flex items-center gap-1.5 py-2 px-3 text-xs font-semibold border-b-2 transition btn-tactile ${
                   ingestMethod === 'skip'
                     ? 'border-emerald-500 text-white'
                     : 'border-transparent text-zinc-400 hover:text-zinc-200'
                 }`}
               >
-                Enter Later
+                <Calendar className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Enter Later</span>
               </button>
             </div>
 
-            {/* Tab 1: Paste BIIS Text */}
-            {ingestMethod === 'biis_paste' && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-300 font-medium text-xs">
-                    Copy table text from biis.buet.ac.bd and paste below:
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleLoadSampleBIIS}
-                    className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold"
-                  >
-                    Load Sample Sheet
-                  </button>
-                </div>
-
-                <textarea
-                  rows={5}
-                  value={biisRawText}
-                  onChange={(e) => {
-                    setBiisRawText(e.target.value);
-                    if (e.target.value) {
-                      setParseResult(parseBIISText(e.target.value));
-                    }
-                  }}
-                  placeholder="Paste Course No, Course Title, Credit, Grade, Grade Point here..."
-                  className="w-full bg-zinc-900 border border-white/[0.08] rounded-xl p-3 text-zinc-100 font-mono tabular-nums text-xs focus:outline-none focus:border-emerald-500"
-                />
-
-                {parseResult && parseResult.courses.length > 0 && (
-                  <div className="p-3 rounded-xl bg-zinc-900 border border-emerald-500/30 flex items-center justify-between font-mono tabular-nums text-xs">
-                    <span className="text-emerald-400 font-semibold">
-                      ✓ Parsed {parseResult.courses.length} courses ({(parseResult.totalCredits || 0).toFixed(2)} Credits)
-                    </span>
-                    <span className="text-zinc-200 font-bold">
-                      Term GPA: {(parseResult.termGpa || 0).toFixed(2)}
-                    </span>
-                  </div>
-                )}
-              </div>
+            {/* Tab 1: Screenshot OCR Scanner */}
+            {ingestMethod === 'screenshot' && (
+              <BIISScreenshotScanner
+                targetSemesterLabel={previousSemestersLabel}
+                onConfirmCourses={(courses, summary) => {
+                  setConfirmedCourses(courses);
+                  setScanSummary(summary);
+                }}
+              />
             )}
 
             {/* Tab 2: Quick GPA Entry */}
@@ -640,7 +590,11 @@ CHEM 114     Inorganic Quantitative Analysis Sessional         0.75      A+     
                 onClick={handleFinalizeSetup}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md transition btn-tactile"
               >
-                <span>Complete Setup & Enter Tracker</span>
+                <span>
+                  {confirmedCourses.length > 0
+                    ? `Complete Setup & Import (${confirmedCourses.length} Courses)`
+                    : 'Complete Setup & Enter Tracker'}
+                </span>
                 <Check className="w-3.5 h-3.5" />
               </button>
             </div>

@@ -33,11 +33,30 @@ const GRADE_POINT_MAP: Record<string, number> = {
   'X': 0.00,
 };
 
-// Course code pattern: 2 to 5 letters followed by optional space and 3 to 4 digits
-const COURSE_CODE_REGEX = /^([A-Z]{2,5})\s*[-_]?\s*(\d{3,4})/i;
+// Course code pattern: 2 to 5 letters followed by optional space and 3 to 4 digits (anywhere on line)
+const COURSE_CODE_REGEX = /\b([A-Z]{2,5})\s*[-_]?\s*(\d{3,4})\b/i;
+
+export function cleanOcrArtifacts(line: string): string {
+  return line
+    .replace(/[\|\[\]\{\}]/g, ' ')
+    .replace(/\bA\s*\+\b/gi, 'A+')
+    .replace(/\bB\s*\+\b/gi, 'B+')
+    .replace(/\bC\s*\+\b/gi, 'C+')
+    .replace(/\bA\s*-\b/gi, 'A-')
+    .replace(/\bB\s*-\b/gi, 'B-')
+    .replace(/\bC\s*-\b/gi, 'C-')
+    .replace(/\b([0-4])\.[O0][O0]\b/gi, '$1.00')
+    .replace(/\b[O0]\.75\b/gi, '0.75')
+    .replace(/\b1\.[S5]0?\b/gi, '1.50')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
 
 export function parseBIISText(text: string): BIISParseResult {
-  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => cleanOcrArtifacts(l))
+    .filter(Boolean);
   const courses: ParsedBIISCourse[] = [];
   const errors: string[] = [];
 
@@ -54,24 +73,10 @@ export function parseBIISText(text: string): BIISParseResult {
       lower.includes('bangladesh university') ||
       lower.includes('student id') ||
       lower.includes('term examination') ||
-      lower.includes('credit earned')
+      lower.includes('credit earned') ||
+      lower.includes('total credits earned')
     ) {
       continue;
-    }
-
-    // Split line by tabs or multiple spaces (standard table columns)
-    // First, normalize multiple whitespace into single space if not tab
-    const hasTabs = line.includes('\t');
-    let tokens: string[] = [];
-
-    if (hasTabs) {
-      tokens = line.split('\t').map((t) => t.trim()).filter(Boolean);
-    } else {
-      // Split by 2 or more spaces, or space tokens
-      tokens = line.split(/\s{2,}/).map((t) => t.trim()).filter(Boolean);
-      if (tokens.length < 3) {
-        tokens = line.split(/\s+/).map((t) => t.trim()).filter(Boolean);
-      }
     }
 
     // Try finding course code in the line
@@ -83,68 +88,69 @@ export function parseBIISText(text: string): BIISParseResult {
     const fullCode = `${match[1].toUpperCase()} ${match[2]}`;
     const courseNum = parseInt(match[2], 10);
 
+    const codeIndex = line.indexOf(match[0]);
+    const afterCode = line.substring(codeIndex + match[0].length).trim();
+
     let credits = 3.0;
     let grade = 'A+';
     let gradePoint = 4.00;
     let title = '';
 
-    // Approach 1: Token-based (BIIS columns: [Code], [Title], [Credit], [Grade], [GradePoint])
-    // If we have separated tokens and the last token is a valid GP (e.g. 4.00, 3.75, etc.)
-    const allTokens = line.split(/\s+/);
-    
-    // Check if the last token is GP
-    const lastToken = allTokens[allTokens.length - 1];
-    const secondLastToken = allTokens[allTokens.length - 2]?.toUpperCase();
-    const thirdLastToken = allTokens[allTokens.length - 3];
+    // Approach 1: Check token sequence at end of line: [Title...] [Credit] [Grade] [GradePoint]
+    const tokens = afterCode.split(/\s+/).filter(Boolean);
+    let matchedBackwards = false;
 
-    const parsedLastGp = parseFloat(lastToken);
-    const isValidGrade = secondLastToken && GRADE_POINT_MAP[secondLastToken] !== undefined;
-    const parsedThirdCredit = parseFloat(thirdLastToken);
+    if (tokens.length >= 3) {
+      const lastToken = tokens[tokens.length - 1];
+      const secondLastToken = tokens[tokens.length - 2]?.toUpperCase();
+      const thirdLastToken = tokens[tokens.length - 3];
 
-    if (!isNaN(parsedLastGp) && isValidGrade && !isNaN(parsedThirdCredit)) {
-      gradePoint = parsedLastGp;
-      grade = secondLastToken;
-      credits = parsedThirdCredit;
+      const parsedLastGp = parseFloat(lastToken);
+      const isValidGrade = secondLastToken && GRADE_POINT_MAP[secondLastToken] !== undefined;
+      const parsedThirdCredit = parseFloat(thirdLastToken);
 
-      // Title is between the course code and the thirdLastToken
-      // e.g. "ME 243 Mechanics of Solids 3.00 A+ 4.00"
-      const codeLen = match[0].length;
-      const afterCode = line.substring(line.indexOf(match[0]) + codeLen).trim();
-      const endIdx = afterCode.lastIndexOf(thirdLastToken);
-      if (endIdx > 0) {
-        title = afterCode.substring(0, endIdx).trim();
+      if (!isNaN(parsedLastGp) && isValidGrade && !isNaN(parsedThirdCredit)) {
+        gradePoint = parsedLastGp;
+        grade = secondLastToken;
+        credits = parsedThirdCredit;
+        title = tokens.slice(0, tokens.length - 3).join(' ').trim();
+        matchedBackwards = true;
       }
-    } else {
-      // Fallback: search explicit grade and credit
-      // Find credit
-      const creditMatch = line.match(/\b(0\.75|1\.50?|2\.00?|3\.00?|4\.00?|6\.00?)\b/);
-      if (creditMatch) {
-        credits = parseFloat(creditMatch[0]);
+    }
+
+    // Approach 2: Fallback search if table tokens are scattered
+    if (!matchedBackwards) {
+      const crMatch = afterCode.match(/\b(0\.75|1\.50?|2\.00?|3\.00?|4\.00?|6\.00?)\b/);
+      if (crMatch) {
+        credits = parseFloat(crMatch[0]);
       }
 
-      // Find grade
-      const gradeMatches = [...line.matchAll(/\b(A\+|A-|A|B\+|B-|B|C\+|C|D|F|S)\b/g)];
-      if (gradeMatches.length > 0) {
-        const lastG = gradeMatches[gradeMatches.length - 1][0].toUpperCase();
-        grade = lastG;
-        gradePoint = GRADE_POINT_MAP[lastG] ?? 4.00;
+      const grMatch = afterCode.match(/(?:^|\s)(A\+|A-|A|B\+|B-|B|C\+|C|D|F|S|X)(?=\s|$)/);
+      if (grMatch) {
+        grade = grMatch[1];
+        gradePoint = GRADE_POINT_MAP[grade] ?? 4.00;
       }
 
-      // Find GP
-      const gpMatch = line.match(/\b(4\.00?|3\.75|3\.50?|3\.25|3\.00?|2\.75|2\.50?|2\.25|2\.00?|0\.00?)\b/);
+      const gpMatch = afterCode.match(/\b(4\.00?|3\.75|3\.50?|3\.25|3\.00?|2\.75|2\.50?|2\.25|2\.00?|0\.00?)\b/);
       if (gpMatch) {
         gradePoint = parseFloat(gpMatch[0]);
       }
 
-      // Clean title
-      title = line
-        .replace(match[0], '')
-        .replace(new RegExp(`\\b${credits.toFixed(2)}|${credits.toFixed(1)}|${credits}\\b`, 'g'), '')
-        .replace(new RegExp(`\\b${grade}\\b`, 'g'), '')
-        .replace(new RegExp(`\\b${gradePoint.toFixed(2)}|${gradePoint.toFixed(1)}\\b`, 'g'), '')
-        .replace(/[\|\t]+/g, ' ')
-        .replace(/\s{2,}/g, ' ')
-        .trim();
+      if (crMatch) {
+        const crIdx = afterCode.indexOf(crMatch[0]);
+        if (crIdx > 0) {
+          title = afterCode.substring(0, crIdx).trim();
+        }
+      }
+
+      if (!title) {
+        title = afterCode
+          .replace(new RegExp(`\\b${credits.toFixed(2)}|${credits.toFixed(1)}|${credits}\\b`, 'g'), '')
+          .replace(new RegExp(`\\b${grade}\\b`, 'g'), '')
+          .replace(new RegExp(`\\b${gradePoint.toFixed(2)}|${gradePoint.toFixed(1)}\\b`, 'g'), '')
+          .replace(/\s{2,}/g, ' ')
+          .trim();
+      }
     }
 
     if (!title || title.length < 2) {
