@@ -3,33 +3,42 @@
 
 /* Keyframe animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes pulseSubtle {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+.animate-fade-in {
+  animation: fadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+.animate-modal-in {
+  animation: modalIn 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .animate-slide-up {
-  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @layer base {
   :root {
     --buet-crimson: #991b1b;
     --buet-crimson-hover: #b91c1c;
-    --buet-gold: #d97706;
+    --buet-emerald: #10b981;
+    --buet-amber: #f59e0b;
+    --bg-base: #09090b;
+    --bg-card: #18181b;
+    --bg-hover: #27272a;
+    --border-hairline: rgba(255, 255, 255, 0.08);
   }
 
   body {
@@ -40,8 +49,8 @@
     user-select: none;
     -webkit-user-select: none;
     overflow-x: hidden;
-    background-color: #080b11;
-    color: #e2e8f0;
+    background-color: #09090b;
+    color: #d4d4d8;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -51,55 +60,67 @@
     -webkit-user-select: text;
     font-family: inherit;
   }
+
+  /* Monospace & tabular numbers */
+  .font-mono,
+  .tabular-nums {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
 }
 
-/* World-class dark surface design */
+/* Polished Dark Theme Surfaces (Zinc 900 / 800) */
 .surface-card {
-  background: rgba(14, 18, 28, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: #18181b;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
-  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
 }
 
 .surface-card-hover {
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .surface-card-hover:hover {
-  background: rgba(19, 25, 39, 0.9);
-  border-color: rgba(255, 255, 255, 0.14);
-  transform: translateY(-1px);
+  background: #27272a;
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .surface-elevated {
-  background: #101420;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: #18181b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
 }
 
-/* Timetable Routine Paper Styling */
-.routine-paper {
-  background: #ffffff;
-  color: #0f172a;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(0, 0, 0, 0.1);
+/* Tactile button feedback */
+.btn-tactile {
+  transition: transform 75ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease;
+}
+.btn-tactile:active {
+  transform: scale(0.96);
 }
 
-/* Striped pattern for Recess Break */
+/* Routine Document Printable Canvas */
+.routine-paper {
+  background: #ffffff;
+  color: #09090b;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+/* Recess break diagonal pattern */
 .recess-pattern {
   background-image: repeating-linear-gradient(
     -45deg,
-    rgba(217, 119, 6, 0.05),
-    rgba(217, 119, 6, 0.05) 8px,
-    rgba(217, 119, 6, 0.12) 8px,
-    rgba(217, 119, 6, 0.12) 16px
+    rgba(245, 158, 11, 0.04),
+    rgba(245, 158, 11, 0.04) 8px,
+    rgba(245, 158, 11, 0.1) 8px,
+    rgba(245, 158, 11, 0.1) 16px
   );
 }
 
 /* Custom Sleek Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -107,12 +128,12 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.14);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.25);
 }
 
 /* Print styling for routine export */

@@ -164,18 +164,18 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         {/* Card 1: Cumulative CGPA */}
         <div className="surface-card p-5 space-y-2 relative overflow-hidden group">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Cumulative CGPA</span>
+            <span className="text-xs font-semibold text-zinc-400">Cumulative CGPA</span>
             <div className="w-8 h-8 rounded-xl bg-emerald-950/80 border border-emerald-800/80 flex items-center justify-center text-emerald-400">
               <Award className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white tracking-tight font-mono">
+            <span className="text-3xl font-extrabold text-white tracking-tight font-mono tabular-nums">
               {currentCGPA}
             </span>
-            <span className="text-xs text-slate-400 font-mono">/ 4.00</span>
+            <span className="text-xs text-zinc-400 font-mono tabular-nums">/ 4.00</span>
           </div>
-          <div className="flex items-center gap-1.5 text-[11px]">
+          <div className="flex items-center gap-1.5 text-xs">
             {Number(currentCGPA) >= 3.75 ? (
               <span className="text-emerald-400 font-semibold flex items-center gap-1">
                 <Sparkles className="w-3 h-3" /> Dean's List / Honours
@@ -189,20 +189,20 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         {/* Card 2: Degree Progress */}
         <div className="surface-card p-5 space-y-2 relative overflow-hidden group">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Degree Progress</span>
+            <span className="text-xs font-semibold text-zinc-400">Degree Progress</span>
             <div className="w-8 h-8 rounded-xl bg-blue-950/80 border border-blue-800/80 flex items-center justify-center text-blue-400">
               <GraduationCap className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white tracking-tight font-mono">
+            <span className="text-3xl font-extrabold text-white tracking-tight font-mono tabular-nums">
               {completedCreditsTotal.toFixed(1)}
             </span>
-            <span className="text-xs text-slate-400 font-mono">/ {totalRequired} cr</span>
+            <span className="text-xs text-zinc-400 font-mono tabular-nums">/ {totalRequired} cr</span>
           </div>
-          <div className="w-full bg-white/[0.06] rounded-full h-1.5 overflow-hidden">
+          <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
             <div
-              className="bg-blue-500 h-full rounded-full transition-all duration-300"
+              className="bg-emerald-500 h-full rounded-full transition-all duration-300"
               style={{ width: `${Math.min(100, (completedCreditsTotal / totalRequired) * 100)}%` }}
             />
           </div>
@@ -211,18 +211,18 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         {/* Card 3: Current Term CT Mean */}
         <div className="surface-card p-5 space-y-2 relative overflow-hidden group">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Current Term CT Mean</span>
+            <span className="text-xs font-semibold text-zinc-400">Current Term CT Mean</span>
             <div className="w-8 h-8 rounded-xl bg-purple-950/80 border border-purple-800/80 flex items-center justify-center text-purple-400">
               <BarChart3 className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white tracking-tight font-mono">
+            <span className="text-3xl font-extrabold text-white tracking-tight font-mono tabular-nums">
               {overallCtMean}%
             </span>
-            <span className="text-xs text-slate-400 font-mono">across theory</span>
+            <span className="text-xs text-zinc-400 font-mono tabular-nums">across theory</span>
           </div>
-          <div className="text-[11px] text-slate-400">
+          <div className="text-xs text-zinc-400 font-medium">
             {ongoingTheoryCourses.length} registered theory courses
           </div>
         </div>
@@ -230,18 +230,18 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         {/* Card 4: Attendance Safety Index */}
         <div className="surface-card p-5 space-y-2 relative overflow-hidden group">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Attendance Health</span>
+            <span className="text-xs font-semibold text-zinc-400">Attendance Health</span>
             <div className="w-8 h-8 rounded-xl bg-amber-950/80 border border-amber-800/80 flex items-center justify-center text-amber-400">
               <ShieldCheck className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white tracking-tight font-mono">
+            <span className="text-3xl font-extrabold text-white tracking-tight font-mono tabular-nums">
               {attendanceData.filter((a) => !a.isNonCollegiate).length} / {attendanceData.length}
             </span>
-            <span className="text-xs text-slate-400 font-mono">Collegiate</span>
+            <span className="text-xs text-zinc-400 font-mono tabular-nums">Collegiate</span>
           </div>
-          <div className="text-[11px] text-emerald-400 font-medium">
+          <div className="text-xs text-emerald-400 font-medium">
             0 Debarred / Non-Collegiate
           </div>
         </div>
@@ -251,21 +251,21 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left: CGPA Progression Line Chart (7 Cols) */}
         <div className="lg:col-span-7 surface-card p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+          <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-xs font-bold text-white tracking-tight">
+              <h3 className="text-sm font-semibold tracking-tight text-zinc-100">
                 CGPA Progression Curve
               </h3>
             </div>
-            <div className="flex items-center gap-3 text-[11px] font-mono">
+            <div className="flex items-center gap-3 text-xs font-mono tabular-nums">
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                <span className="text-slate-300">Cumulative CGPA</span>
+                <span className="text-zinc-200">Cumulative CGPA</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-blue-400" />
-                <span className="text-slate-400">Term GPA</span>
+                <span className="text-zinc-400">Term GPA</span>
               </div>
             </div>
           </div>
@@ -276,27 +276,27 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" />
                 <XAxis
                   dataKey="semester"
-                  stroke="#64748b"
+                  stroke="#71717a"
                   fontSize={11}
                   tickLine={false}
                 />
                 <YAxis
                   domain={[2.5, 4.0]}
-                  stroke="#64748b"
+                  stroke="#71717a"
                   fontSize={11}
                   tickLine={false}
                   ticks={[2.5, 3.0, 3.5, 3.75, 4.0]}
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#121624',
+                    backgroundColor: '#18181b',
                     border: '1px solid rgba(255, 255, 255, 0.12)',
                     borderRadius: '12px',
                     fontSize: '11px',
                     color: '#fff',
                   }}
                 />
-                <ReferenceLine y={3.75} stroke="#d97706" strokeDasharray="4 4" label={{ value: 'Honours (3.75)', fill: '#d97706', fontSize: 10, position: 'right' }} />
+                <ReferenceLine y={3.75} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: 'Honours (3.75)', fill: '#f59e0b', fontSize: 10, position: 'right' }} />
                 <Line
                   type="monotone"
                   dataKey="cumulativeCGPA"
@@ -320,27 +320,27 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
         {/* Right: Interactive Projected CGPA Simulator (5 Cols) */}
         <div className="lg:col-span-5 surface-card p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+          <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
             <div className="flex items-center gap-2">
               <Sliders className="w-4 h-4 text-purple-400" />
-              <h3 className="text-xs font-bold text-white tracking-tight">
+              <h3 className="text-sm font-semibold tracking-tight text-zinc-100">
                 Projected CGPA Simulator
               </h3>
             </div>
-            <span className="text-[11px] text-slate-400 font-mono">
+            <span className="text-xs text-zinc-400 font-mono tabular-nums">
               {settings.currentSemesterId}
             </span>
           </div>
 
           <div className="space-y-4">
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Drag the slider to test hypothetical grade outcomes for your ongoing {ongoingCreditsTotal} registered credits.
+            <p className="text-xs text-zinc-300 leading-relaxed">
+              Drag the slider to test hypothetical grade outcomes for your ongoing <span className="font-mono tabular-nums font-bold text-zinc-100">{ongoingCreditsTotal}</span> registered credits.
             </p>
 
-            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-3">
+            <div className="p-4 rounded-xl bg-zinc-900 border border-white/[0.08] space-y-3">
               <div className="flex justify-between items-baseline">
-                <span className="text-xs text-slate-300 font-medium">Target Term GPA</span>
-                <span className="text-2xl font-bold font-mono text-purple-400">
+                <span className="text-xs text-zinc-300 font-medium">Target Term GPA</span>
+                <span className="text-2xl font-bold font-mono tabular-nums text-purple-400">
                   {simulatedTermGpa.toFixed(2)}
                 </span>
               </div>
@@ -352,10 +352,10 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                 step="0.05"
                 value={simulatedTermGpa}
                 onChange={(e) => handleSliderChange(parseFloat(e.target.value))}
-                className="w-full h-2 bg-white/[0.08] rounded-lg appearance-none cursor-pointer accent-purple-500"
+                className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
               />
 
-              <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+              <div className="flex justify-between text-[11px] text-zinc-400 font-mono tabular-nums">
                 <span>2.00</span>
                 <span>3.00</span>
                 <span>3.75 (Honours)</span>
@@ -363,16 +363,16 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-gradient-to-br from-purple-950/30 to-blue-950/20 border border-purple-900/40 flex items-center justify-between">
+            <div className="p-4 rounded-xl bg-gradient-to-br from-zinc-900 via-zinc-900 to-emerald-950/30 border border-emerald-500/30 flex items-center justify-between">
               <div>
-                <span className="text-[11px] text-purple-300 font-medium block">
+                <span className="text-xs text-emerald-400 font-semibold block">
                   Projected Graduation CGPA
                 </span>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-zinc-400">
                   After current {ongoingCreditsTotal} cr completed
                 </span>
               </div>
-              <div className="text-3xl font-extrabold font-mono text-white">
+              <div className="text-3xl font-extrabold font-mono tabular-nums text-white">
                 {simulatedCGPA}
               </div>
             </div>
@@ -384,10 +384,10 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left: Current Term CT Performance (6 Cols) */}
         <div className="lg:col-span-6 surface-card p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+          <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
             <div className="flex items-center gap-2">
               <BarChart3 className="w-4 h-4 text-blue-400" />
-              <h3 className="text-xs font-bold text-white tracking-tight">
+              <h3 className="text-sm font-semibold tracking-tight text-zinc-100">
                 Theory Course CT Mean Percentage
               </h3>
             </div>
@@ -397,11 +397,11 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={ctPerformanceData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" />
-                <XAxis dataKey="courseCode" stroke="#64748b" fontSize={11} tickLine={false} />
-                <YAxis domain={[0, 100]} stroke="#64748b" fontSize={11} tickLine={false} unit="%" />
+                <XAxis dataKey="courseCode" stroke="#71717a" fontSize={11} tickLine={false} />
+                <YAxis domain={[0, 100]} stroke="#71717a" fontSize={11} tickLine={false} unit="%" />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#121624',
+                    backgroundColor: '#18181b',
                     border: '1px solid rgba(255, 255, 255, 0.12)',
                     borderRadius: '12px',
                     fontSize: '11px',
@@ -420,14 +420,14 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
         {/* Right: Attendance Safety Meters (6 Cols) */}
         <div className="lg:col-span-6 surface-card p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+          <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-xs font-bold text-white tracking-tight">
+              <h3 className="text-sm font-semibold tracking-tight text-zinc-100">
                 Attendance Safety Buffers
               </h3>
             </div>
-            <span className="text-[11px] text-slate-400">
+            <span className="text-xs text-zinc-400 font-medium">
               Red line marks 60% Debarment limit
             </span>
           </div>
@@ -437,18 +437,18 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
               <div key={att.courseCode} className="space-y-1 text-xs">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-white">{att.courseCode}</span>
-                    <span className="text-slate-400 text-[11px] truncate max-w-[160px]">{att.title}</span>
+                    <span className="font-mono tabular-nums font-bold text-zinc-100">{att.courseCode}</span>
+                    <span className="text-zinc-400 text-xs truncate max-w-[160px]">{att.title}</span>
                   </div>
-                  <div className="flex items-center gap-2 font-mono">
-                    <span className="font-bold text-white">{att.percentage}%</span>
-                    <span className="text-slate-400 text-[10px]">
+                  <div className="flex items-center gap-2 font-mono tabular-nums">
+                    <span className="font-bold text-zinc-100">{att.percentage}%</span>
+                    <span className="text-zinc-400 text-xs">
                       ({att.safeBunksTo60} safe bunks)
                     </span>
                   </div>
                 </div>
 
-                <div className="relative w-full h-2 bg-white/[0.06] rounded-full overflow-hidden">
+                <div className="relative w-full h-2 bg-zinc-900 rounded-full overflow-hidden border border-white/[0.06]">
                   <div
                     className={`h-full rounded-full transition-all duration-300 ${
                       att.percentage >= 90
