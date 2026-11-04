@@ -1,0 +1,27 @@
+{
+  "appId": "com.buetracker.app",
+  "productName": "BUETracker",
+  "copyright": "Copyright © 2026 BUET Students",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "public/**/*",
+    "package.json"
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "dir",
+        "arch": ["x64"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ]
+  }
+}
+

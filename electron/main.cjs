@@ -2,26 +2,26 @@ const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
-
 let mainWindow = null;
 
 function createWindow() {
+  const iconPath = path.join(__dirname, '../public/icon.png');
+
   mainWindow = new BrowserWindow({
     width: 1360,
     height: 860,
     minWidth: 1024,
     minHeight: 700,
     title: 'BUETracker - BUET Academic Suite',
-    icon: path.join(__dirname, '../public/icon.png'),
-    backgroundColor: '#0f172a',
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
+    backgroundColor: '#020617',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: true,
     },
-    frame: true, // Native titlebar with controls
+    frame: true,
     autoHideMenuBar: false
   });
 
@@ -80,8 +80,8 @@ function createWindow() {
             dialog.showMessageBox(mainWindow, {
               type: 'info',
               title: 'About BUETracker',
-              message: 'BUETracker - BUET Academic Suite',
-              detail: 'Tailored for Bangladesh University of Engineering and Technology (BUET) students.\n\nFeatures:\n• BUET Timetable Designer & High-Res Exporter\n• BUET Ordinance Continuous Assessment Engine (Best n of n+1 CTs, Attendance Slabs, Term Final Targets)\n• Course & Historical Term Management with BIIS Parser\n• Academic Analytics & CGPA Projection Engine\n\nVersion 1.0.0'
+              message: 'BUETracker - BUET Academic Suite (Native PC)',
+              detail: 'Tailored for Bangladesh University of Engineering and Technology (BUET) students.\n\nModules:\n• Module A: Official Period Routine Designer & High-Res Exporter\n• Module B: Course & Semester Management with BIIS Parser\n• Module C: BUET Ordinance Continuous Assessment Engine\n• Module D: CGPA Trajectory & Analytics Dashboard\n\nVersion 1.0.0 (Native Windows Application)'
             });
           }
         }
@@ -92,11 +92,14 @@ function createWindow() {
   const menu = Menu.buildFromTemplate(menuTemplate);
   Menu.setApplicationMenu(menu);
 
-  if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
-    // Open DevTools in dev mode if requested
+  const distIndexPath = path.join(__dirname, '../dist/index.html');
+
+  if (process.env.VITE_DEV_SERVER_URL) {
+    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+  } else if (fs.existsSync(distIndexPath)) {
+    mainWindow.loadFile(distIndexPath);
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    mainWindow.loadURL('http://localhost:5173');
   }
 
   mainWindow.on('closed', () => {
@@ -135,4 +138,3 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
-
