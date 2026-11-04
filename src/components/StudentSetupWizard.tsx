@@ -182,7 +182,7 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
     } else {
       // Non-freshman: Ingest courses detected from Screenshot OCR
       if (ingestMethod === 'screenshot' && confirmedCourses.length > 0) {
-        const targetPrevSemId = previousSemesters[0]?.id || 'L1T1';
+        const targetPrevSemId = previousSemesters[previousSemesters.length - 1]?.id || 'L1T1';
         initialCourses = confirmedCourses.map((parsed) =>
           convertParsedCourseToAppCourse(parsed, targetPrevSemId, false)
         );

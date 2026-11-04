@@ -142,22 +142,36 @@ export function App() {
     initialCourses: Course[],
     initialRoutine: RoutineMetadata
   ) => {
-    await db.transaction('rw', db.courses, db.routines, db.settings, async () => {
-      await db.courses.clear();
-      await db.routines.clear();
-      await db.settings.clear();
+    try {
+      await db.transaction('rw', db.courses, db.routines, db.settings, async () => {
+        await db.courses.clear();
+        await db.routines.clear();
+        await db.settings.clear();
 
-      if (initialCourses.length > 0) {
-        await db.courses.bulkAdd(initialCourses);
+        if (initialCourses.length > 0) {
+          await db.courses.bulkPut(initialCourses);
+        }
+        await db.routines.put(initialRoutine);
+        await db.settings.put({ id: 'primary_settings', ...newSettings });
+      });
+    } catch (err) {
+      console.error('Failed to commit setup to database:', err);
+    } finally {
+      setSettings(newSettings);
+      setCourses(initialCourses);
+      setRoutine(initialRoutine);
+
+      // Smart navigation: If user imported only previous completed courses, take them to courses tab
+      const hasOngoing = initialCourses.some((c) => c.isOngoing);
+      if (!hasOngoing && initialCourses.length > 0) {
+        setActiveTab('courses');
+      } else {
+        setActiveTab('routine');
       }
-      await db.routines.add(initialRoutine);
-      await db.settings.add({ id: 'primary_settings', ...newSettings });
-    });
 
-    setSettings(newSettings);
-    setCourses(initialCourses);
-    setRoutine(initialRoutine);
-    showToast(`Welcome, ${newSettings.studentName.split(' ')[0]}! Your workspace is ready.`);
+      const firstName = newSettings.studentName?.trim().split(' ')[0] || 'Student';
+      showToast(`Welcome, ${firstName}! Your workspace is ready.`);
+    }
   };
 
   // Explicit demo sample load (only if user asks for it)

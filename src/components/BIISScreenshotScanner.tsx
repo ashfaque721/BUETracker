@@ -84,7 +84,20 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
       }
 
       setDetectedCourses(result.courses);
+      if (result.termGpa !== undefined) {
+        setTermGpa(result.termGpa);
+      }
+      if (result.totalCredits !== undefined) {
+        setTotalCredits(result.totalCredits);
+      }
       recalculateSummary(result.courses);
+
+      // Auto-notify parent with detected courses
+      onConfirmCourses(result.courses, {
+        termGpa: result.termGpa,
+        totalCredits: result.totalCredits,
+      });
+
       setIsScanning(false);
     } catch (err: any) {
       console.error('Scan error:', err);
@@ -483,3 +496,4 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
     </div>
   );
 };
+

@@ -14,8 +14,8 @@ export async function preprocessImage(imageSource: File | Blob | string): Promis
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas');
-        // Ensure minimum width of 1400px for crisp character edges
-        const scale = Math.max(1, 1400 / img.naturalWidth);
+        // Low-resolution screenshots (e.g. 700x279) need 3.5x scale so font height is >= 35px
+        const scale = Math.max(3.5, 2200 / img.naturalWidth);
         canvas.width = Math.round(img.naturalWidth * scale);
         canvas.height = Math.round(img.naturalHeight * scale);
 
@@ -25,26 +25,35 @@ export async function preprocessImage(imageSource: File | Blob | string): Promis
           return;
         }
 
-        // Draw image scaled
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        // Fetch image data for high-contrast binarization / grayscale
+        // Fetch image data for high-contrast binarization & watermark/border elimination
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
 
         for (let i = 0; i < data.length; i += 4) {
-          // Standard luminance formula
           const r = data[i];
           const g = data[i + 1];
           const b = data[i + 2];
-          const gray = 0.299 * r + 0.587 * g + 0.114 * b;
 
-          // Gentle contrast stretch: push dark text to darker, bright paper to whiter
-          const enhanced = gray > 190 ? 255 : gray < 110 ? 0 : gray;
+          // BIIS red table borders: high red, lower green & blue
+          const isRedBorder = r > 70 && (r - g) > 20 && (r - b) > 20;
 
-          data[i] = enhanced;
-          data[i + 1] = enhanced;
-          data[i + 2] = enhanced;
+          // Pure dark text in BIIS table (r, g, b < 115)
+          // The "Not Official" watermark is light gray (r, g, b > 130) or hollow
+          const isDarkText = r < 115 && g < 115 && b < 115 && !isRedBorder;
+
+          if (isDarkText) {
+            data[i] = 0;
+            data[i + 1] = 0;
+            data[i + 2] = 0;
+          } else {
+            data[i] = 255;
+            data[i + 1] = 255;
+            data[i + 2] = 255;
+          }
         }
 
         ctx.putImageData(imageData, 0, 0);
@@ -75,7 +84,7 @@ export async function scanBIISScreenshot(
   onProgress?: (percent: number, message: string) => void
 ): Promise<{ rawText: string; result: BIISParseResult }> {
   try {
-    onProgress?.(10, 'Enhancing screenshot clarity...');
+    onProgress?.(10, 'Enhancing screenshot clarity & removing watermarks...');
     const preprocessedDataUrl = await preprocessImage(imageSource);
 
     onProgress?.(25, 'Initializing local OCR engine...');
@@ -90,12 +99,17 @@ export async function scanBIISScreenshot(
       },
     });
 
-    onProgress?.(50, 'Extracting text from grade sheet table...');
+    onProgress?.(45, 'Configuring character detection for BUET tables...');
+    await worker.setParameters({
+      tessedit_pageseg_mode: '6' as any, // Single uniform block of text
+    });
+
+    onProgress?.(60, 'Extracting courses, credits and grades...');
     const ret = await worker.recognize(preprocessedDataUrl);
     await worker.terminate();
 
     const rawText = ret.data.text || '';
-    onProgress?.(95, 'Parsing BUET courses, credits & GPA...');
+    onProgress?.(95, 'Reconciling BUET Ordinance course codes & GPA...');
 
     const parseResult = parseBIISText(rawText);
     onProgress?.(100, 'Scan completed!');
@@ -158,13 +172,15 @@ export function generateSampleBIISScreenshot(): string {
   ctx.fillText('Grade Point', 830, 125);
 
   const sampleRows = [
-    { code: 'MATH 191', title: 'Differential and Integral Calculus', credit: '3.00', grade: 'A+', gp: '4.00' },
-    { code: 'PHY 109', title: 'Physics I (Heat, Waves and Optics)', credit: '3.00', grade: 'A', gp: '3.75' },
-    { code: 'CHEM 109', title: 'Chemistry I', credit: '3.00', grade: 'A+', gp: '4.00' },
-    { code: 'HUM 101', title: 'English and Economics', credit: '3.00', grade: 'A-', gp: '3.50' },
-    { code: 'ME 160', title: 'Mechanical Engineering Drawing-I', credit: '1.50', grade: 'A+', gp: '4.00' },
-    { code: 'PHY 102', title: 'Physics Sessional', credit: '0.75', grade: 'A+', gp: '4.00' },
-    { code: 'CHEM 114', title: 'Inorganic Quantitative Analysis Sessional', credit: '0.75', grade: 'A+', gp: '4.00' },
+    { code: 'CHEM 114', title: 'Inorganic Quantitative Analysis Sessional', credit: '1.50', grade: 'A', gp: '3.75' },
+    { code: 'CHEM 119', title: 'Chemistry - I', credit: '3.00', grade: 'B+', gp: '3.25' },
+    { code: 'HUM 102', title: 'English Language Practice', credit: '1.50', grade: 'A-', gp: '3.50' },
+    { code: 'HUM 211', title: 'Sociology', credit: '2.00', grade: 'A+', gp: '4.00' },
+    { code: 'IPE 105', title: 'Principles of Cost and Management Accounting', credit: '3.00', grade: 'A', gp: '3.75' },
+    { code: 'MATH 191', title: 'Differential and Integral Calculus', credit: '4.00', grade: 'A+', gp: '4.00' },
+    { code: 'ME 160', title: 'Mechanical Engineering Drawing - I', credit: '1.50', grade: 'A', gp: '3.75' },
+    { code: 'PHY 117', title: 'Structure of Matter, Electricity, Magnetism and Modern Physics', credit: '3.00', grade: 'B-', gp: '2.75' },
+    { code: 'SHOP 170', title: 'Machine Shop', credit: '0.75', grade: 'A+', gp: '4.00' },
   ];
 
   let y = 142;
@@ -200,7 +216,8 @@ export function generateSampleBIISScreenshot(): string {
   ctx.fillStyle = '#0f172a';
   ctx.font = 'bold 13px "Segoe UI", Arial, sans-serif';
   ctx.textAlign = 'right';
-  ctx.fillText('Total Credits Earned: 15.00    |    Term GPA: 3.85', 920, y + 26);
+  ctx.fillText('GPA: 3.59', 920, y + 26);
 
   return canvas.toDataURL('image/png');
 }
+
