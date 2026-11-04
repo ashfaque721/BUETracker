@@ -20,11 +20,13 @@ import {
   MapPin,
   User,
   BookOpen,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
   RotateCcw,
   Check,
+  Eye,
+  LayoutGrid,
+  ChevronDown,
+  FileText,
+  Coffee,
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
@@ -41,7 +43,9 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
   courses,
   onUpdateRoutine,
 }) => {
-  const routineRef = useRef<HTMLDivElement>(null);
+  const exportCanvasRef = useRef<HTMLDivElement>(null);
+  const [viewMode, setViewMode] = useState<'studio' | 'document'>('studio');
+
   const [selectedSlot, setSelectedSlot] = useState<{
     day: DayOfWeek;
     periodId: number;
@@ -54,7 +58,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
   const [customNickname, setCustomNickname] = useState<string>('');
   const [customTeacher, setCustomTeacher] = useState<string>('');
   const [customRoom, setCustomRoom] = useState<string>('');
-  const [customColor, setCustomColor] = useState<string>('#b91c1c');
+  const [customColor, setCustomColor] = useState<string>('#991b1b');
   const [span, setSpan] = useState<number>(1);
 
   // Header editing
@@ -65,20 +69,17 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
 
   const [isExporting, setIsExporting] = useState(false);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
 
-  // Quick Preset Colors
   const PRESET_COLORS = [
-    { name: 'BUET Crimson', hex: '#b91c1c' },
-    { name: 'Sapphire Blue', hex: '#2563eb' },
-    { name: 'Emerald Green', hex: '#059669' },
-    { name: 'Amber Gold', hex: '#d97706' },
-    { name: 'Royal Violet', hex: '#7c3aed' },
-    { name: 'Teal Cyan', hex: '#0891b2' },
-    { name: 'Rose Pink', hex: '#e11d48' },
-    { name: 'Dark Slate', hex: '#475569' },
+    { name: 'BUET Crimson', hex: '#991b1b' },
+    { name: 'Blue', hex: '#2563eb' },
+    { name: 'Emerald', hex: '#059669' },
+    { name: 'Amber', hex: '#d97706' },
+    { name: 'Violet', hex: '#7c3aed' },
+    { name: 'Rose', hex: '#e11d48' },
   ];
 
-  // Helper to open edit slot modal
   const handleCellClick = (day: DayOfWeek, periodId: number) => {
     const existingSlot = routine.slots.find(
       (s) => s.day === day && s.periodId === periodId
@@ -92,7 +93,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
       setCustomNickname(existingSlot.customNickname || '');
       setCustomTeacher(existingSlot.customTeacher || '');
       setCustomRoom(existingSlot.customRoom || '');
-      setCustomColor(existingSlot.customColor || '#b91c1c');
+      setCustomColor(existingSlot.customColor || '#991b1b');
       setSpan(existingSlot.span || 1);
     } else {
       setSelectedCourseId('');
@@ -100,7 +101,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
       setCustomNickname('');
       setCustomTeacher('');
       setCustomRoom('');
-      setCustomColor('#b91c1c');
+      setCustomColor('#991b1b');
       setSpan(1);
     }
   };
@@ -115,7 +116,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
       setCustomNickname(`(${course.nickname || course.title})`);
       setCustomTeacher(course.teacher || '');
       setCustomRoom(course.room || '');
-      setCustomColor(course.color || '#b91c1c');
+      setCustomColor(course.color || '#991b1b');
     }
   };
 
@@ -145,7 +146,6 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
       customColor,
     };
 
-    // Remove any slots that collide with this new slot or overlap with its span
     const periodsCovered = new Set<number>();
     for (let i = 0; i < newSlot.span; i++) {
       periodsCovered.add(periodId + i);
@@ -194,13 +194,13 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
   };
 
   const handleLoadSeedPreset = () => {
-    if (window.confirm('Load default Level-2 Term-1 Section A timetable preset?')) {
+    if (window.confirm('Reset timetable to official Level-2 Term-1 Section A preset?')) {
       onUpdateRoutine(SEED_ROUTINE);
     }
   };
 
   const handleClearRoutine = () => {
-    if (window.confirm('Clear all slots in current timetable?')) {
+    if (window.confirm('Clear all classes in timetable?')) {
       onUpdateRoutine({
         ...routine,
         slots: [],
@@ -208,14 +208,14 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
     }
   };
 
-  // High-Resolution PNG Exporter (2.5x crisp render)
   const handleExportPNG = async () => {
-    if (!routineRef.current) return;
+    if (!exportCanvasRef.current) return;
     try {
       setIsExporting(true);
-      setExportNotice('Rendering Razor-Sharp 2.5× DPI PNG...');
+      setShowExportDropdown(false);
+      setExportNotice('Rendering Crisp 2.5× DPI PNG...');
 
-      const dataUrl = await toPng(routineRef.current, {
+      const dataUrl = await toPng(exportCanvasRef.current, {
         pixelRatio: 2.5,
         backgroundColor: '#ffffff',
         cacheBust: true,
@@ -226,24 +226,24 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
       link.href = dataUrl;
       link.click();
 
-      setExportNotice('PNG Downloaded Successfully (High-Resolution)!');
-      setTimeout(() => setExportNotice(null), 3500);
+      setExportNotice('PNG Downloaded (2.5× DPI)');
+      setTimeout(() => setExportNotice(null), 3000);
     } catch (err) {
       console.error('Export PNG failed:', err);
-      setExportNotice('Failed to export PNG.');
+      setExportNotice('Failed to export PNG');
     } finally {
       setIsExporting(false);
     }
   };
 
-  // High-Resolution PDF Exporter (A4 Landscape)
   const handleExportPDF = async () => {
-    if (!routineRef.current) return;
+    if (!exportCanvasRef.current) return;
     try {
       setIsExporting(true);
-      setExportNotice('Generating Crisp A4 Landscape Vector PDF...');
+      setShowExportDropdown(false);
+      setExportNotice('Generating A4 Landscape Vector PDF...');
 
-      const dataUrl = await toPng(routineRef.current, {
+      const dataUrl = await toPng(exportCanvasRef.current, {
         pixelRatio: 2.5,
         backgroundColor: '#ffffff',
       });
@@ -256,28 +256,25 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
 
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-
       const margin = 10;
       const printWidth = pageWidth - margin * 2;
       const imgProps = pdf.getImageProperties(dataUrl);
       const printHeight = (imgProps.height * printWidth) / imgProps.width;
-
       const yOffset = printHeight < pageHeight ? (pageHeight - printHeight) / 2 : margin;
 
       pdf.addImage(dataUrl, 'PNG', margin, yOffset, printWidth, Math.min(printHeight, pageHeight - margin * 2));
       pdf.save(`${routine.title.replace(/[\s\W]+/g, '_')}_BUET_Routine.pdf`);
 
-      setExportNotice('PDF Exported Successfully (A4 Landscape)!');
-      setTimeout(() => setExportNotice(null), 3500);
+      setExportNotice('PDF Exported (A4 Landscape)');
+      setTimeout(() => setExportNotice(null), 3000);
     } catch (err) {
       console.error('Export PDF failed:', err);
-      setExportNotice('Failed to export PDF.');
+      setExportNotice('Failed to export PDF');
     } finally {
       setIsExporting(false);
     }
   };
 
-  // Helper to check if a day & period is covered by a spanning slot
   const getSlotCovering = (day: DayOfWeek, periodId: number) => {
     return routine.slots.find((s) => {
       if (s.day !== day) return false;
@@ -286,161 +283,196 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Studio Header & Action Control Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/90 backdrop-blur-md border border-slate-800/80 p-5 rounded-3xl shadow-xl no-print">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-600 via-red-700 to-amber-800 border border-red-500/30 flex items-center justify-center text-white shadow-lg shadow-red-950/60">
-            <Calendar className="w-6 h-6" />
+    <div className="space-y-4">
+      {/* Sleek Floating Action Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-[#0f131f]/80 backdrop-blur-md border border-white/[0.08] shadow-lg no-print">
+        {/* Left: Routine Metadata Badge with Quick Edit */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+            <h2 className="text-sm font-bold text-white tracking-tight">
+              {routine.title}
+            </h2>
+            <span className="text-[11px] text-slate-400 font-medium hidden md:inline">
+              • {routine.effectiveDate}
+            </span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-black tracking-tight text-white">
-                BUET Departmental Routine Studio
-              </h2>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-950 text-red-300 border border-red-800/80">
-                Official Periods
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Sat–Wed • Periods 1–6 (8:00–1:30) • Recess (1:30–2:30) • Period 7 Lab (2:30–5:00)
-            </p>
-          </div>
-        </div>
-
-        {/* Quick Toolbar */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Preset Buttons */}
-          <button
-            onClick={handleLoadSeedPreset}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
-            title="Load IPE'23 Section A Timetable Preset"
-          >
-            <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
-            <span>Load Sec A Preset</span>
-          </button>
 
           <button
             onClick={() => setIsEditingHeader(true)}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] transition"
+            title="Edit Timetable Title & Date"
           >
-            <Edit2 className="w-3.5 h-3.5 text-blue-400" />
-            <span>Edit Header</span>
+            <Edit2 className="w-3.5 h-3.5" />
           </button>
+        </div>
 
-          {/* Export PNG */}
-          <button
-            onClick={handleExportPNG}
-            disabled={isExporting}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-950/60 transition disabled:opacity-50"
-            title="Export 2.5× DPI Ultra-Crisp PNG (Ctrl+E)"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export PNG (2.5×)</span>
-          </button>
+        {/* Right: View Toggle, Presets, and Export Engine */}
+        <div className="flex items-center gap-2.5">
+          {/* Quick Presets */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleLoadSeedPreset}
+              className="px-2.5 py-1.5 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-white/[0.06] border border-white/[0.06] transition"
+              title="Reset to BUET Level-2 Term-1 Section A preset"
+            >
+              Load Sec A
+            </button>
+            <button
+              onClick={handleClearRoutine}
+              className="px-2.5 py-1.5 rounded-xl text-xs text-slate-400 hover:text-rose-400 hover:bg-white/[0.06] border border-transparent hover:border-white/[0.06] transition"
+              title="Clear all classes"
+            >
+              Clear
+            </button>
+          </div>
 
-          {/* Export PDF */}
-          <button
-            onClick={handleExportPDF}
-            disabled={isExporting}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white shadow-lg shadow-red-950/60 transition disabled:opacity-50"
-            title="Export A4 Landscape PDF"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export PDF (A4)</span>
-          </button>
+          <div className="h-4 w-[1px] bg-white/[0.1]" />
 
-          {/* Print */}
-          <button
-            onClick={() => window.print()}
-            className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
-            title="Print Routine (Ctrl+P)"
-          >
-            <Printer className="w-4 h-4 text-emerald-400" />
-          </button>
+          {/* View Mode Segmented Pill */}
+          <div className="flex items-center p-1 rounded-xl bg-white/[0.04] border border-white/[0.08] text-xs">
+            <button
+              onClick={() => setViewMode('studio')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg transition ${
+                viewMode === 'studio'
+                  ? 'bg-white/10 text-white font-semibold shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5 text-blue-400" />
+              <span>Studio Grid</span>
+            </button>
+            <button
+              onClick={() => setViewMode('document')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg transition ${
+                viewMode === 'document'
+                  ? 'bg-white/10 text-white font-semibold shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Eye className="w-3.5 h-3.5 text-red-400" />
+              <span>Print Preview</span>
+            </button>
+          </div>
+
+          <div className="h-4 w-[1px] bg-white/[0.1]" />
+
+          {/* Export Split Dropdown */}
+          <div className="relative">
+            <div className="flex items-center rounded-xl bg-white/10 border border-white/12 overflow-hidden shadow-xs">
+              <button
+                onClick={handleExportPNG}
+                disabled={isExporting}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-white text-xs font-semibold hover:bg-white/10 transition disabled:opacity-50"
+              >
+                <Download className="w-3.5 h-3.5 text-blue-400" />
+                <span>Export PNG (2.5×)</span>
+              </button>
+
+              <button
+                onClick={() => setShowExportDropdown(!showExportDropdown)}
+                className="px-2 py-1.5 text-slate-300 hover:bg-white/10 border-l border-white/10 transition"
+              >
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Dropdown Menu */}
+            {showExportDropdown && (
+              <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-[#121624] border border-white/12 shadow-2xl p-1.5 z-50 animate-slide-up text-xs">
+                <button
+                  onClick={handleExportPNG}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-slate-200 hover:bg-white/[0.08] transition"
+                >
+                  <Download className="w-3.5 h-3.5 text-blue-400" />
+                  <div>
+                    <div className="font-semibold text-white">PNG Image</div>
+                    <div className="text-[10px] text-slate-400">2.5× High-Res DPI</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={handleExportPDF}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-slate-200 hover:bg-white/[0.08] transition"
+                >
+                  <FileText className="w-3.5 h-3.5 text-red-400" />
+                  <div>
+                    <div className="font-semibold text-white">Vector PDF</div>
+                    <div className="text-[10px] text-slate-400">A4 Landscape Vector</div>
+                  </div>
+                </button>
+
+                <div className="my-1 border-t border-white/[0.06]" />
+
+                <button
+                  onClick={() => {
+                    setShowExportDropdown(false);
+                    window.print();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-slate-200 hover:bg-white/[0.08] transition"
+                >
+                  <Printer className="w-3.5 h-3.5 text-emerald-400" />
+                  <div>
+                    <div className="font-semibold text-white">Print Routine</div>
+                    <div className="text-[10px] text-slate-400">System Print (Ctrl+P)</div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {exportNotice && (
-        <div className="p-3.5 bg-blue-950/80 border border-blue-600/80 rounded-2xl text-xs text-blue-200 flex items-center justify-between animate-fade-in no-print">
-          <span className="flex items-center gap-2 font-medium">
-            <Sparkles className="w-4 h-4 text-amber-400 animate-spin" />
-            {exportNotice}
-          </span>
+        <div className="p-3 bg-blue-950/50 border border-blue-900/60 rounded-xl text-xs text-blue-300 flex items-center gap-2.5 animate-fade-in no-print shadow-md">
+          <Sparkles className="w-4 h-4 text-blue-400 animate-spin" />
+          <span className="font-medium">{exportNotice}</span>
         </div>
       )}
 
-      {/* Routine Studio Workbench / Document Canvas Container */}
-      <div className="bg-slate-900/40 p-4 sm:p-8 rounded-3xl border border-slate-800/80 shadow-2xl overflow-x-auto">
-        <div className="flex justify-between items-center mb-3 text-xs text-slate-400 px-2 no-print">
-          <span className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            Official Timetable Canvas • Click any cell to assign or edit course details
-          </span>
-          <span className="font-mono text-[11px] text-slate-500">
-            A4 Landscape Aspect Ratio • Crisp 2.5× Scale
-          </span>
-        </div>
-
-        {/* The Printable Paper Container */}
-        <div
-          ref={routineRef}
-          className="min-w-[1040px] bg-white text-slate-900 p-8 rounded-2xl shadow-2xl border-2 border-slate-300 select-none print:m-0 print:p-2 print:shadow-none print:border-none"
-          style={{ fontFamily: 'Inter, Arial, sans-serif' }}
-        >
-          {/* Header Banner matching BUET Timetable Standards */}
-          <div className="text-center border-b-2 border-slate-900 pb-4 mb-4">
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <span className="text-[11px] uppercase tracking-widest font-black text-red-900 bg-red-50 px-3.5 py-0.5 rounded-full border border-red-200">
-                Bangladesh University of Engineering and Technology (BUET)
+      {/* VIEW 1: STUDIO WORKBENCH (Dark, High-End Desktop Interface) */}
+      {viewMode === 'studio' && (
+        <div className="rounded-2xl border border-white/[0.08] bg-[#0c101a] p-4 sm:p-5 shadow-2xl overflow-x-auto">
+          {/* Studio Header Info Bar */}
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/[0.06]">
+            <div className="flex items-center gap-3">
+              <span className="px-2 py-0.5 rounded-md bg-red-950/80 text-red-300 border border-red-800/80 text-[10px] font-bold uppercase tracking-wider">
+                Official BUET Grid
+              </span>
+              <span className="text-xs text-slate-400 font-medium">
+                {routine.subTitle}
               </span>
             </div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-950 uppercase mt-1">
-              {routine.title}
-            </h1>
-            <p className="text-xs font-bold text-slate-700 mt-0.5 tracking-wide">{routine.subTitle}</p>
-            <div className="flex items-center justify-center gap-4 mt-1.5 text-[11px] text-slate-600 font-semibold">
-              <span className="font-mono">{routine.effectiveDate}</span>
-              <span>•</span>
-              <span>Class Duration: 50 Min (Theory) / 150 Min (Lab)</span>
+            <div className="text-[11px] text-slate-500 font-mono">
+              Click any cell to assign course or lab block
             </div>
           </div>
 
-          {/* Timetable Table Grid */}
-          <table className="w-full border-collapse border-2 border-slate-900 text-xs text-center table-fixed">
+          <table className="w-full border-collapse text-xs text-center table-fixed min-w-[1020px]">
             <thead>
-              <tr className="bg-slate-100 text-slate-950 border-b-2 border-slate-900">
-                {/* Day Header */}
-                <th className="w-24 p-2.5 font-black border-r-2 border-slate-900 text-xs uppercase bg-slate-200">
-                  Day \ Period
+              <tr className="border-b border-white/[0.08] text-slate-400">
+                <th className="w-24 p-3 text-left font-bold text-[11px] uppercase tracking-wider text-slate-300">
+                  Day
                 </th>
-
-                {/* Periods 1 to 6 */}
                 {BUET_PERIODS.filter((p) => p.id >= 1 && p.id <= 6).map((period) => (
-                  <th key={period.id} className="p-2 border-r border-slate-600 font-bold">
-                    <div className="text-xs font-black uppercase text-slate-950">
+                  <th key={period.id} className="p-2 border-l border-white/[0.06]">
+                    <div className="inline-flex items-center justify-center px-2 py-0.5 rounded-md bg-white/[0.04] text-[11px] font-bold text-slate-200">
                       {period.name}
                     </div>
-                    <div className="text-[10px] font-mono text-slate-600 font-semibold mt-0.5">
-                      {period.timeRange}
-                    </div>
+                    <div className="text-[10px] font-mono text-slate-400 mt-1">{period.timeRange}</div>
                   </th>
                 ))}
-
-                {/* Fixed RECESS Column Header */}
-                <th className="w-14 p-1 border-r border-slate-700 bg-amber-100/90 text-amber-950 font-bold">
-                  <div className="text-[10px] font-black uppercase tracking-wider">RECESS</div>
-                  <div className="text-[9px] font-mono font-bold mt-0.5">1:30–2:30</div>
+                <th className="w-14 p-1 border-l border-white/[0.06] text-amber-400 font-bold text-[10px] uppercase tracking-wider">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <Coffee className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Recess</span>
+                  </div>
                 </th>
-
-                {/* Period 7 (Afternoon Lab) */}
-                <th className="w-40 p-2 border-slate-900 bg-blue-50 font-bold">
-                  <div className="text-xs font-black uppercase text-blue-950">
-                    Period 7 (LAB)
+                <th className="w-40 p-2 border-l border-white/[0.06]">
+                  <div className="inline-flex items-center justify-center px-2 py-0.5 rounded-md bg-blue-950/60 border border-blue-800/60 text-[11px] font-bold text-blue-300">
+                    Period 7 (Lab)
                   </div>
-                  <div className="text-[10px] font-mono text-blue-800 font-semibold mt-0.5">
-                    2:30 - 5:00 PM
-                  </div>
+                  <div className="text-[10px] font-mono text-slate-400 mt-1">2:30 – 5:00 PM</div>
                 </th>
               </tr>
             </thead>
@@ -448,29 +480,25 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
             <tbody>
               {BUET_DAYS.map((day, dayIndex) => {
                 let skipPeriods = 0;
-
                 return (
-                  <tr
-                    key={day}
-                    className={`border-b-2 border-slate-900 ${
-                      dayIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'
-                    }`}
-                  >
-                    {/* Day Label */}
-                    <td className="p-2.5 font-black border-r-2 border-slate-900 text-slate-950 text-xs uppercase bg-slate-100/80">
-                      {day}
+                  <tr key={day} className="border-b border-white/[0.05] hover:bg-white/[0.01] transition-colors">
+                    {/* Day Column */}
+                    <td className="p-3 text-left font-bold text-slate-200 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                        <span>{day}</span>
+                      </div>
                     </td>
 
                     {/* Periods 1 to 6 */}
                     {[1, 2, 3, 4, 5, 6].map((periodId) => {
                       if (skipPeriods > 0) {
                         skipPeriods--;
-                        return null; // Don't render covered cell
+                        return null;
                       }
 
                       const coveringSlot = getSlotCovering(day, periodId);
 
-                      // If this cell is the starting slot
                       if (coveringSlot && coveringSlot.periodId === periodId) {
                         const spanCount = Math.min(coveringSlot.span, 7 - periodId);
                         if (spanCount > 1) {
@@ -482,148 +510,136 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                             key={periodId}
                             colSpan={spanCount}
                             onClick={() => handleCellClick(day, periodId)}
-                            className="p-2 border-r border-slate-600 align-middle cursor-pointer hover:ring-2 hover:ring-blue-500 hover:ring-inset transition-all relative group"
-                            style={{
-                              backgroundColor: `${coveringSlot.customColor || '#b91c1c'}12`,
-                              borderLeft: `4px solid ${coveringSlot.customColor || '#b91c1c'}`,
-                            }}
-                            title="Click to edit or remove class slot"
+                            className="p-1.5 border-l border-white/[0.05] align-middle cursor-pointer"
                           >
-                            <div className="flex flex-col justify-center items-center py-0.5">
-                              {/* Line 1: Course Code */}
-                              <div
-                                className="text-xs font-black tracking-wide"
-                                style={{ color: coveringSlot.customColor || '#800000' }}
-                              >
-                                {coveringSlot.customCode}
+                            <div
+                              className="p-2.5 rounded-xl border transition group hover:scale-[1.01] shadow-xs text-left"
+                              style={{
+                                backgroundColor: `${coveringSlot.customColor || '#991b1b'}18`,
+                                borderColor: `${coveringSlot.customColor || '#991b1b'}50`,
+                              }}
+                            >
+                              <div className="flex items-center justify-between gap-1">
+                                <span
+                                  className="font-bold text-xs tracking-tight"
+                                  style={{ color: coveringSlot.customColor || '#f87171' }}
+                                >
+                                  {coveringSlot.customCode}
+                                </span>
+                                {spanCount > 1 && (
+                                  <span className="text-[9px] px-1 py-0.2 rounded bg-white/10 font-mono text-slate-300">
+                                    {spanCount}P Block
+                                  </span>
+                                )}
                               </div>
 
-                              {/* Line 2: Nickname */}
                               {coveringSlot.customNickname && (
-                                <div className="text-[11px] font-bold text-slate-700 leading-tight mt-0.5">
+                                <div className="text-[11px] text-slate-300 font-medium truncate mt-0.5">
                                   {coveringSlot.customNickname}
                                 </div>
                               )}
 
-                              {/* Line 3: Teacher */}
-                              {coveringSlot.customTeacher && (
-                                <div className="text-[10px] text-slate-600 font-semibold italic mt-0.5">
-                                  {coveringSlot.customTeacher}
-                                </div>
-                              )}
-
-                              {/* Line 4: Room */}
-                              {coveringSlot.customRoom && (
-                                <div className="text-[9px] font-bold text-slate-800 bg-white px-1.5 py-0.5 rounded border border-slate-300 mt-1 shadow-xs">
-                                  {coveringSlot.customRoom}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Hover Edit Hint Pill */}
-                            <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity no-print">
-                              <span className="p-0.5 rounded bg-white/90 text-blue-600 shadow-sm border border-slate-300">
-                                <Edit2 className="w-2.5 h-2.5" />
-                              </span>
+                              <div className="flex items-center justify-between gap-1 mt-1.5 text-[10px] text-slate-400">
+                                {coveringSlot.customTeacher ? (
+                                  <span className="truncate italic text-slate-400">{coveringSlot.customTeacher}</span>
+                                ) : (
+                                  <span />
+                                )}
+                                {coveringSlot.customRoom && (
+                                  <span className="font-mono text-slate-300 bg-white/[0.08] px-1.5 py-0.5 rounded text-[9px] shrink-0">
+                                    {coveringSlot.customRoom}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </td>
                         );
                       }
 
-                      // Empty Slot
                       return (
                         <td
                           key={periodId}
                           onClick={() => handleCellClick(day, periodId)}
-                          className="p-1 border-r border-slate-300 align-middle text-slate-300 hover:bg-blue-50/70 hover:text-blue-500 cursor-pointer transition-colors group"
-                          title="Click to assign class"
+                          className="p-1.5 border-l border-white/[0.05] align-middle cursor-pointer hover:bg-white/[0.02] transition-colors group"
                         >
-                          <div className="py-4 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Plus className="w-4 h-4 text-blue-500" />
+                          <div className="h-16 rounded-xl border border-dashed border-white/[0.06] group-hover:border-white/20 flex flex-col items-center justify-center gap-1 transition">
+                            <Plus className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-300 transition" />
+                            <span className="text-[9px] text-slate-600 group-hover:text-slate-400 transition">
+                              Add Slot
+                            </span>
                           </div>
                         </td>
                       );
                     })}
 
-                    {/* Fixed Recess / Prayer & Lunch Break Column */}
+                    {/* Fixed Recess Column */}
                     {dayIndex === 0 && (
                       <td
                         rowSpan={5}
-                        className="w-14 border-r border-slate-700 bg-amber-50 p-1 text-center align-middle font-bold text-amber-900 border-b-2 border-slate-900"
+                        className="w-14 border-l border-white/[0.06] recess-pattern text-center align-middle"
                       >
-                        <div className="flex flex-col items-center justify-center gap-2 py-4">
-                          <span className="text-[10px] font-black uppercase tracking-widest [writing-mode:vertical-rl] rotate-180 text-amber-950">
-                            PRAYER & LUNCH BREAK (1:30 - 2:30 PM)
-                          </span>
+                        <div className="[writing-mode:vertical-rl] rotate-180 text-[10px] uppercase font-bold tracking-widest text-amber-400/90 mx-auto py-6">
+                          Prayer & Lunch Break
                         </div>
                       </td>
                     )}
 
-                    {/* Period 7 (Afternoon Lab: 2:30 - 5:00) */}
+                    {/* Period 7 (Lab) Slot */}
                     {(() => {
-                      const labSlot = routine.slots.find(
-                        (s) => s.day === day && s.periodId === 7
-                      );
-
+                      const labSlot = routine.slots.find((s) => s.day === day && s.periodId === 7);
                       if (labSlot) {
                         return (
                           <td
                             key={7}
                             onClick={() => handleCellClick(day, 7)}
-                            className="p-2 border-slate-900 align-middle cursor-pointer hover:ring-2 hover:ring-blue-500 hover:ring-inset transition relative group"
-                            style={{
-                              backgroundColor: `${labSlot.customColor || '#7c3aed'}15`,
-                              borderLeft: `4px solid ${labSlot.customColor || '#7c3aed'}`,
-                            }}
-                            title="Click to edit or remove lab slot"
+                            className="p-1.5 border-l border-white/[0.05] align-middle cursor-pointer"
                           >
-                            <div className="flex flex-col items-center justify-center py-1">
-                              <span className="text-[8px] font-black text-red-700 uppercase tracking-wider bg-red-100 px-1.5 py-0.5 rounded border border-red-200">
-                                SESSIONAL / LAB
-                              </span>
-                              <div
-                                className="text-xs font-black tracking-wide mt-1"
-                                style={{ color: labSlot.customColor || '#1e3a8a' }}
-                              >
-                                {labSlot.customCode}
+                            <div
+                              className="p-2.5 rounded-xl border transition group hover:scale-[1.01] shadow-xs text-left"
+                              style={{
+                                backgroundColor: `${labSlot.customColor || '#7c3aed'}18`,
+                                borderColor: `${labSlot.customColor || '#7c3aed'}50`,
+                              }}
+                            >
+                              <div className="flex items-center justify-between gap-1">
+                                <span
+                                  className="font-bold text-xs tracking-tight"
+                                  style={{ color: labSlot.customColor || '#a78bfa' }}
+                                >
+                                  {labSlot.customCode}
+                                </span>
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-950 text-blue-300 font-bold uppercase tracking-wider">
+                                  Lab
+                                </span>
                               </div>
+
                               {labSlot.customNickname && (
-                                <div className="text-[11px] font-bold text-slate-800 mt-0.5">
+                                <div className="text-[11px] text-slate-300 font-medium truncate mt-0.5">
                                   {labSlot.customNickname}
                                 </div>
                               )}
-                              {labSlot.customTeacher && (
-                                <div className="text-[10px] text-slate-600 font-semibold italic mt-0.5">
-                                  {labSlot.customTeacher}
-                                </div>
-                              )}
-                              {labSlot.customRoom && (
-                                <div className="text-[9px] font-bold text-slate-900 bg-white px-1.5 py-0.5 rounded border border-slate-300 mt-1 shadow-xs">
-                                  {labSlot.customRoom}
-                                </div>
-                              )}
-                            </div>
 
-                            {/* Hover Edit Pill */}
-                            <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity no-print">
-                              <span className="p-0.5 rounded bg-white/90 text-blue-600 shadow-sm border border-slate-300">
-                                <Edit2 className="w-2.5 h-2.5" />
-                              </span>
+                              <div className="flex items-center justify-between gap-1 mt-1.5 text-[10px] text-slate-400">
+                                <span className="truncate italic">{labSlot.customTeacher || 'Lab Sessional'}</span>
+                                {labSlot.customRoom && (
+                                  <span className="font-mono text-slate-300 bg-white/[0.08] px-1.5 py-0.5 rounded text-[9px] shrink-0">
+                                    {labSlot.customRoom}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </td>
                         );
                       }
-
                       return (
                         <td
                           key={7}
                           onClick={() => handleCellClick(day, 7)}
-                          className="p-2 border-slate-300 align-middle text-slate-300 hover:bg-blue-50/70 hover:text-blue-500 cursor-pointer transition group"
-                          title="Click to assign Lab / Sessional"
+                          className="p-1.5 border-l border-white/[0.05] align-middle cursor-pointer hover:bg-white/[0.02] transition-colors group"
                         >
-                          <div className="py-4 flex flex-col items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Plus className="w-4 h-4 text-blue-500" />
-                            <span className="text-[9px] text-blue-600 font-bold">
+                          <div className="h-16 rounded-xl border border-dashed border-white/[0.06] group-hover:border-white/20 flex flex-col items-center justify-center gap-1 transition">
+                            <Plus className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-300 transition" />
+                            <span className="text-[9px] text-slate-600 group-hover:text-slate-400 transition">
                               Assign Lab
                             </span>
                           </div>
@@ -635,14 +651,154 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
               })}
             </tbody>
           </table>
+        </div>
+      )}
 
-          {/* Routine Footer Notes */}
-          <div className="mt-4 pt-3 border-t border-slate-300 flex flex-wrap items-center justify-between text-[11px] text-slate-600 font-medium">
-            <div className="flex items-center gap-4">
-              <span>* BUET Academic Week runs Saturday through Wednesday. Thursday & Friday are official weekends.</span>
+      {/* VIEW 2: DOCUMENT VIEW (Pristine Executive Print Canvas) */}
+      <div className={viewMode === 'document' ? 'block' : 'hidden'}>
+        <div className="p-4 sm:p-6 rounded-2xl bg-slate-900/40 border border-white/[0.08] overflow-x-auto shadow-2xl">
+          <div
+            ref={exportCanvasRef}
+            className="min-w-[1040px] bg-white text-slate-900 p-8 rounded-xl routine-paper select-none"
+            style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
+          >
+            {/* Clean Academic Header */}
+            <div className="text-center border-b-2 border-slate-900 pb-4 mb-4">
+              <div className="text-[12px] uppercase tracking-widest font-bold text-red-900 mb-1">
+                Bangladesh University of Engineering and Technology (BUET)
+              </div>
+              <h1 className="text-xl font-bold tracking-tight text-slate-950 uppercase">
+                {routine.title}
+              </h1>
+              <p className="text-xs text-slate-700 font-semibold mt-0.5">{routine.subTitle}</p>
+              <div className="text-[11px] text-slate-600 font-medium mt-1">
+                Effective: {routine.effectiveDate} • Theory Periods: 50 Min / Sessional Lab: 150 Min
+              </div>
             </div>
-            <div className="font-bold text-slate-800">
-              Generated via BUETracker Academic Suite
+
+            {/* Document Table Grid */}
+            <table className="w-full border-collapse border-2 border-slate-900 text-xs text-center table-fixed">
+              <thead>
+                <tr className="bg-slate-100 text-slate-950 border-b-2 border-slate-900 font-bold text-[11px]">
+                  <th className="w-24 p-2.5 border-r border-slate-400 uppercase">Day</th>
+                  {BUET_PERIODS.filter((p) => p.id >= 1 && p.id <= 6).map((period) => (
+                    <th key={period.id} className="p-2 border-r border-slate-300">
+                      <div>{period.name}</div>
+                      <div className="text-[9px] text-slate-600 font-normal">{period.timeRange}</div>
+                    </th>
+                  ))}
+                  <th className="w-12 p-1 border-r border-slate-400 bg-amber-50 text-amber-950 text-[10px] uppercase font-bold">
+                    Recess
+                  </th>
+                  <th className="w-36 p-2 border-slate-900 bg-slate-50">
+                    <div>Period 7 (Lab)</div>
+                    <div className="text-[9px] text-slate-600 font-normal">2:30 – 5:00 PM</div>
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {BUET_DAYS.map((day, dayIndex) => {
+                  let skipPeriods = 0;
+                  return (
+                    <tr key={day} className="border-b border-slate-400">
+                      <td className="p-2.5 border-r border-slate-900 font-bold text-slate-950 bg-slate-50 text-xs">
+                        {day}
+                      </td>
+
+                      {[1, 2, 3, 4, 5, 6].map((periodId) => {
+                        if (skipPeriods > 0) {
+                          skipPeriods--;
+                          return null;
+                        }
+
+                        const coveringSlot = getSlotCovering(day, periodId);
+                        if (coveringSlot && coveringSlot.periodId === periodId) {
+                          const spanCount = Math.min(coveringSlot.span, 7 - periodId);
+                          if (spanCount > 1) skipPeriods = spanCount - 1;
+
+                          return (
+                            <td
+                              key={periodId}
+                              colSpan={spanCount}
+                              className="p-2 border-r border-slate-400 align-middle"
+                              style={{
+                                backgroundColor: `${coveringSlot.customColor || '#991b1b'}0d`,
+                                borderLeft: `3px solid ${coveringSlot.customColor || '#991b1b'}`,
+                              }}
+                            >
+                              <div className="font-bold text-xs" style={{ color: coveringSlot.customColor || '#800000' }}>
+                                {coveringSlot.customCode}
+                              </div>
+                              {coveringSlot.customNickname && (
+                                <div className="text-[10px] text-slate-800 font-semibold">
+                                  {coveringSlot.customNickname}
+                                </div>
+                              )}
+                              {coveringSlot.customTeacher && (
+                                <div className="text-[9px] text-slate-600 italic">
+                                  {coveringSlot.customTeacher}
+                                </div>
+                              )}
+                              {coveringSlot.customRoom && (
+                                <div className="text-[9px] text-slate-900 font-mono mt-0.5 font-medium">
+                                  {coveringSlot.customRoom}
+                                </div>
+                              )}
+                            </td>
+                          );
+                        }
+
+                        return <td key={periodId} className="p-1 border-r border-slate-300" />;
+                      })}
+
+                      {dayIndex === 0 && (
+                        <td
+                          rowSpan={5}
+                          className="w-12 border-r border-slate-400 bg-amber-50/70 p-1 text-center align-middle font-bold text-amber-950"
+                        >
+                          <div className="[writing-mode:vertical-rl] rotate-180 text-[10px] uppercase tracking-wider mx-auto py-3">
+                            Prayer & Lunch Break
+                          </div>
+                        </td>
+                      )}
+
+                      {(() => {
+                        const labSlot = routine.slots.find((s) => s.day === day && s.periodId === 7);
+                        if (labSlot) {
+                          return (
+                            <td
+                              key={7}
+                              className="p-2 align-middle border-slate-400"
+                              style={{
+                                backgroundColor: `${labSlot.customColor || '#7c3aed'}0d`,
+                                borderLeft: `3px solid ${labSlot.customColor || '#7c3aed'}`,
+                              }}
+                            >
+                              <div className="text-[8px] font-bold text-slate-500 uppercase">Sessional Lab</div>
+                              <div className="font-bold text-xs" style={{ color: labSlot.customColor || '#581c87' }}>
+                                {labSlot.customCode}
+                              </div>
+                              {labSlot.customNickname && (
+                                <div className="text-[10px] text-slate-800 font-semibold">{labSlot.customNickname}</div>
+                              )}
+                              {labSlot.customRoom && (
+                                <div className="text-[9px] text-slate-900 font-mono font-medium">{labSlot.customRoom}</div>
+                              )}
+                            </td>
+                          );
+                        }
+                        return <td key={7} className="p-1" />;
+                      })()}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            <div className="mt-4 pt-2 border-t border-slate-300 flex justify-between text-[10px] text-slate-500">
+              <span>* Official BUET Academic Timetable • Saturday through Wednesday</span>
+              <span>Rendered with BUETracker</span>
             </div>
           </div>
         </div>
@@ -651,15 +807,15 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
       {/* Edit Header Modal */}
       {isEditingHeader && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in no-print">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl p-6 max-w-lg w-full shadow-2xl text-white space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold flex items-center gap-2">
-                <Edit2 className="w-4 h-4 text-blue-400" />
-                Edit Routine Header & Department Info
+          <div className="bg-[#101422] border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl text-white space-y-4">
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Edit2 className="w-4 h-4 text-red-400" />
+                Edit Timetable Header
               </h3>
               <button
                 onClick={() => setIsEditingHeader(false)}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-white text-xs p-1"
               >
                 ✕
               </button>
@@ -667,55 +823,46 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block font-semibold text-slate-300 mb-1">
-                  Routine Main Title
-                </label>
+                <label className="block text-slate-400 mb-1 font-medium">Routine Title</label>
                 <input
                   type="text"
                   value={tempTitle}
                   onChange={(e) => setTempTitle(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-blue-500"
-                  placeholder="e.g. Class Routine of IPE'23 Section A"
+                  className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-red-500 transition"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-300 mb-1">
-                  Sub-Title (Level, Term & Department)
-                </label>
+                <label className="block text-slate-400 mb-1 font-medium">Subtitle / Department / Section</label>
                 <input
                   type="text"
                   value={tempSubTitle}
                   onChange={(e) => setTempSubTitle(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                  placeholder="e.g. Level-2 Term-1 | Department of Industrial & Production Engineering, BUET"
+                  className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-red-500 transition"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-300 mb-1">
-                  Effective Date / Session
-                </label>
+                <label className="block text-slate-400 mb-1 font-medium">Effective Date / Term Info</label>
                 <input
                   type="text"
                   value={tempEffectiveDate}
                   onChange={(e) => setTempEffectiveDate(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
-                  placeholder="e.g. Effective from: November 2026"
+                  className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-red-500 transition"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+            <div className="flex justify-end gap-2 pt-3 border-t border-white/[0.08]">
               <button
                 onClick={() => setIsEditingHeader(false)}
-                className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                className="px-4 py-2 rounded-xl text-slate-300 hover:bg-white/[0.05] text-xs font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveHeader}
-                className="px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-500 text-white transition shadow-md"
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-md transition"
               >
                 Save Header
               </button>
@@ -724,216 +871,163 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
         </div>
       )}
 
-      {/* Edit Slot Modal with Live Preview */}
+      {/* Edit Slot Modal */}
       {selectedSlot && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in no-print">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl p-6 max-w-lg w-full shadow-2xl text-white space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="bg-[#101422] border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl text-white space-y-4">
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
               <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-blue-400" />
-                  {selectedSlot.day} — {selectedSlot.periodId === 7 ? 'Period 7 (2:30 - 5:00 PM)' : `Period ${selectedSlot.periodId}`}
+                <h3 className="text-sm font-semibold text-white">
+                  {selectedSlot.day} • {selectedSlot.periodId === 7 ? 'Period 7 Lab' : `Period ${selectedSlot.periodId}`}
                 </h3>
-                <p className="text-xs text-slate-400">
-                  {selectedSlot.periodId === 7
-                    ? 'Dedicated Afternoon Sessional / Lab Slot'
-                    : 'Class / Lecture Slot'}
-                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Assign or customize timetable slot</p>
               </div>
               <button
                 onClick={() => setSelectedSlot(null)}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-white text-xs p-1"
               >
                 ✕
               </button>
             </div>
 
-            {/* Live Visual Preview of Cell */}
-            <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 block mb-2">
-                Live Timetable Cell Preview
-              </span>
-              <div
-                className="p-3 rounded-xl border border-slate-300 bg-white text-center shadow-md"
-                style={{
-                  borderLeft: `4px solid ${customColor}`,
-                  backgroundColor: `${customColor}12`,
-                }}
-              >
-                <div className="text-xs font-black tracking-wide" style={{ color: customColor }}>
-                  {customCode || 'COURSE CODE'}
-                </div>
-                <div className="text-[11px] font-bold text-slate-700 mt-0.5">
-                  {customNickname || '(Topic Nickname)'}
-                </div>
-                <div className="text-[10px] text-slate-600 font-semibold italic mt-0.5">
-                  {customTeacher || "Teacher's Name"}
-                </div>
-                <div className="inline-block text-[9px] font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-300 mt-1 shadow-xs">
-                  {customRoom || 'Room: ---'}
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Select from Registered Courses */}
+            {/* Quick Fill from Courses */}
             {courses.length > 0 && (
-              <div className="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/80">
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                  <BookOpen className="w-3.5 h-3.5 text-blue-400" />
-                  Quick Fill from Course Manager
-                </label>
+              <div>
+                <label className="block text-[11px] text-slate-400 mb-1 font-medium">Choose Registered Course</label>
                 <select
                   value={selectedCourseId}
                   onChange={(e) => handleCourseSelect(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 font-medium"
+                  className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500 transition"
                 >
-                  <option value="">-- Choose Course to Auto-Fill --</option>
+                  <option value="">-- Manual Entry / Custom Slot --</option>
                   {courses.map((c) => (
                     <option key={c.id} value={c.id}>
-                      [{c.code}] {c.title} ({c.type.toUpperCase()}) {c.teacher ? `• ${c.teacher}` : ''}
+                      [{c.code}] {c.title}
                     </option>
                   ))}
                 </select>
               </div>
             )}
 
-            {/* Detailed Slot Fields */}
             <div className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block font-semibold text-slate-300 mb-1">
-                    Course Code (Bold) *
-                  </label>
+                  <label className="block text-slate-400 mb-1 font-medium">Course Code *</label>
                   <input
                     type="text"
+                    required
+                    placeholder="ME 243"
                     value={customCode}
                     onChange={(e) => setCustomCode(e.target.value)}
-                    placeholder="e.g. ME 243, IPE 205"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-blue-500"
+                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-1.5 text-white font-bold focus:outline-none focus:border-red-500"
                   />
                 </div>
-
                 <div>
-                  <label className="block font-semibold text-slate-300 mb-1">
-                    Topic / Nickname in ()
-                  </label>
+                  <label className="block text-slate-400 mb-1 font-medium">Nickname / Topic</label>
                   <input
                     type="text"
+                    placeholder="(Solid Mech)"
                     value={customNickname}
                     onChange={(e) => setCustomNickname(e.target.value)}
-                    placeholder="e.g. (Solid Mech)"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-1.5 text-white focus:outline-none focus:border-red-500"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block font-semibold text-slate-300 mb-1 flex items-center gap-1">
-                    <User className="w-3 h-3 text-emerald-400" />
-                    Teacher's Name
-                  </label>
+                  <label className="block text-slate-400 mb-1 font-medium">Teacher</label>
                   <input
                     type="text"
+                    placeholder="SA Ma'am"
                     value={customTeacher}
                     onChange={(e) => setCustomTeacher(e.target.value)}
-                    placeholder="e.g. SA Ma'am, Kayes Sir"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-1.5 text-white focus:outline-none focus:border-red-500"
                   />
                 </div>
-
                 <div>
-                  <label className="block font-semibold text-slate-300 mb-1 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-rose-400" />
-                    Room / Lab Details
-                  </label>
+                  <label className="block text-slate-400 mb-1 font-medium">Room / Lab</label>
                   <input
                     type="text"
+                    placeholder="IPE 317"
                     value={customRoom}
                     onChange={(e) => setCustomRoom(e.target.value)}
-                    placeholder="e.g. Room: IPE 317"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-1.5 text-white font-mono focus:outline-none focus:border-red-500"
                   />
                 </div>
               </div>
 
-              {/* Color Presets Palette */}
+              {/* Span Selector for Multi-Period Labs (Only for Periods 1-6) */}
+              {selectedSlot.periodId <= 5 && (
+                <div>
+                  <label className="block text-slate-400 mb-1 font-medium">Period Block Span</label>
+                  <div className="flex gap-2">
+                    {[1, 2, 3].map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setSpan(s)}
+                        className={`flex-1 py-1.5 rounded-xl border text-xs font-semibold transition ${
+                          span === s
+                            ? 'bg-red-600 text-white border-red-500 shadow-xs'
+                            : 'bg-white/[0.04] text-slate-400 border-white/[0.08] hover:text-white'
+                        }`}
+                      >
+                        {s} {s === 1 ? 'Period' : 'Periods'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Color Preset Picker */}
               <div>
-                <label className="block font-semibold text-slate-300 mb-1.5">
-                  Cell Accent Color
-                </label>
-                <div className="flex items-center gap-2 flex-wrap">
+                <label className="block text-slate-400 mb-1.5 font-medium">Card Highlight Color</label>
+                <div className="flex items-center gap-2">
                   {PRESET_COLORS.map((color) => (
                     <button
                       key={color.hex}
                       type="button"
                       onClick={() => setCustomColor(color.hex)}
-                      className={`w-6 h-6 rounded-full border-2 transition-transform ${
-                        customColor === color.hex ? 'scale-110 border-white' : 'border-transparent'
+                      className={`w-6 h-6 rounded-full border-2 transition ${
+                        customColor === color.hex ? 'border-white scale-110' : 'border-transparent opacity-75'
                       }`}
                       style={{ backgroundColor: color.hex }}
                       title={color.name}
                     />
                   ))}
-                  <input
-                    type="color"
-                    value={customColor}
-                    onChange={(e) => setCustomColor(e.target.value)}
-                    className="w-6 h-6 rounded border border-slate-700 bg-transparent cursor-pointer ml-1"
-                    title="Custom Color"
-                  />
                 </div>
               </div>
-
-              {/* Period Span (for multi-period morning labs) */}
-              {selectedSlot.periodId !== 7 && (
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1 flex items-center gap-1">
-                    <Layers className="w-3 h-3 text-purple-400" />
-                    Span (Periods)
-                  </label>
-                  <select
-                    value={span}
-                    onChange={(e) => setSpan(parseInt(e.target.value, 10))}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                  >
-                    <option value={1}>1 Period (Standard Lecture: 50 Min)</option>
-                    <option value={2}>2 Periods (Double Lecture: 110 Min)</option>
-                    <option value={3}>3 Periods (Morning Lab Block: 170 Min)</option>
-                  </select>
-                </div>
-              )}
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+            <div className="flex items-center justify-between pt-3 border-t border-white/[0.08]">
               {selectedSlot.existingSlot ? (
                 <button
                   type="button"
                   onClick={handleDeleteSlot}
-                  className="flex items-center gap-1 px-3 py-2 text-xs font-semibold rounded-xl bg-red-950/80 hover:bg-red-900 text-red-300 border border-red-800/80 transition"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 text-xs transition"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  Clear Cell
+                  <span>Remove</span>
                 </button>
               ) : (
                 <div />
               )}
 
-              <div className="flex items-center gap-2">
+              <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => setSelectedSlot(null)}
-                  className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                  className="px-3 py-1.5 rounded-xl text-slate-300 hover:bg-white/[0.05] text-xs"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveSlot}
-                  className="px-4 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-950/60 transition"
+                  className="px-4 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-md transition"
                 >
-                  Save to Timetable
+                  Save Slot
                 </button>
               </div>
             </div>

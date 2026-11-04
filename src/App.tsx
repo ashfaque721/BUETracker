@@ -19,22 +19,17 @@ import { OrdinanceEngine } from './components/OrdinanceEngine';
 import { CourseManager } from './components/CourseManager';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { WelcomeTutorialModal } from './components/WelcomeTutorialModal';
+import { SettingsModal } from './components/SettingsModal';
 import { calculateGPA } from './utils/buetOrdinance';
 import {
   Calendar,
   Calculator,
   BookOpen,
   BarChart3,
-  Download,
-  Upload,
-  Keyboard,
+  Settings,
   Sparkles,
-  Award,
-  RotateCcw,
   GraduationCap,
-  HelpCircle,
-  ShieldCheck,
-  Check,
+  CheckCircle2,
 } from 'lucide-react';
 
 export function App() {
@@ -44,14 +39,14 @@ export function App() {
   const [settings, setSettings] = useState<UserSettings>(SEED_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage(null);
-    }, 3500);
+    }, 3200);
   };
 
   // Load from Dexie DB on Mount
@@ -66,7 +61,7 @@ export function App() {
       if (allRoutines.length > 0) setRoutine(allRoutines[0]);
       if (allSettings.length > 0) setSettings(allSettings[0]);
 
-      // Check if welcome tutorial should be shown
+      // Check if welcome tutorial should be shown on launch
       const hideWelcome = localStorage.getItem('buetracker_hide_welcome');
       if (!hideWelcome) {
         setShowTutorial(true);
@@ -87,11 +82,11 @@ export function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        showToast('All database changes saved & synced locally!');
+        showToast('Database changes saved locally');
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') {
         e.preventDefault();
         setActiveTab('routine');
-        showToast('Switched to Routine Designer for export!');
+        showToast('Switched to Timetable Studio');
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
         e.preventDefault();
         window.print();
@@ -100,18 +95,17 @@ export function App() {
 
     window.addEventListener('keydown', handleKeyDown);
 
-    // If running in Electron, attach IPC listeners
     if ((window as any).electronAPI) {
       const api = (window as any).electronAPI;
       api.onTriggerExportRoutine(() => {
         setActiveTab('routine');
-        showToast('Switched to Routine Designer for export!');
+        showToast('Switched to Timetable Studio for export');
       });
       api.onTriggerPrintRoutine(() => window.print());
-      api.onTriggerSaveDb(() => showToast('Database synced to offline storage.'));
+      api.onTriggerSaveDb(() => showToast('Database saved locally'));
       api.onTriggerBackupJson(handleExportBackup);
       api.onTriggerRestoreJson(() => {
-        document.getElementById('restore-file-input')?.click();
+        setShowSettingsModal(true);
       });
     }
 
@@ -122,7 +116,7 @@ export function App() {
   const handleAddCourse = async (course: Course) => {
     await db.courses.add(course);
     setCourses((prev) => [...prev, course]);
-    showToast(`Added ${course.code} to course list.`);
+    showToast(`Added course ${course.code}`);
   };
 
   const handleUpdateCourse = async (course: Course) => {
@@ -133,19 +127,26 @@ export function App() {
   const handleDeleteCourse = async (courseId: string) => {
     await db.courses.delete(courseId);
     setCourses((prev) => prev.filter((c) => c.id !== courseId));
-    showToast('Course removed.');
+    showToast('Course deleted');
   };
 
   const handleBulkAddCourses = async (newCourses: Course[]) => {
     await db.courses.bulkAdd(newCourses);
     setCourses((prev) => [...prev, ...newCourses]);
-    showToast(`Successfully imported ${newCourses.length} courses!`);
+    showToast(`Imported ${newCourses.length} courses`);
   };
 
   // Routine Handler
   const handleUpdateRoutine = async (updated: RoutineMetadata) => {
     await db.routines.put(updated);
     setRoutine(updated);
+  };
+
+  // Settings Handler
+  const handleUpdateSettings = async (updated: UserSettings) => {
+    await db.settings.put({ id: 'primary_settings', ...updated });
+    setSettings(updated);
+    showToast('Student settings updated');
   };
 
   // Backup & Restore
@@ -159,10 +160,10 @@ export function App() {
       a.download = `BUETracker_Backup_${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast('JSON Backup downloaded successfully!');
+      showToast('JSON Backup downloaded');
     } catch (err) {
       console.error(err);
-      showToast('Failed to export backup.');
+      showToast('Failed to export backup');
     }
   };
 
@@ -175,18 +176,19 @@ export function App() {
       const success = await importDatabaseJSON(text);
       if (success) {
         await loadData();
-        showToast('Backup restored successfully!');
+        showToast('Backup restored successfully');
+        setShowSettingsModal(false);
       } else {
-        showToast('Invalid backup file format.');
+        showToast('Invalid backup file format');
       }
     } catch (err) {
       console.error(err);
-      showToast('Error reading backup file.');
+      showToast('Error reading backup file');
     }
   };
 
   const handleResetToSeeds = async () => {
-    if (window.confirm('Reset all courses, routines, and assessments to default BUET seed data?')) {
+    if (window.confirm('Reset all courses, routines, and assessments to default BUET Level-2 Term-1 seed data?')) {
       await db.courses.clear();
       await db.routines.clear();
       await db.settings.clear();
@@ -194,7 +196,8 @@ export function App() {
       await db.routines.add(SEED_ROUTINE);
       await db.settings.add({ id: 'primary_settings', ...SEED_SETTINGS });
       await loadData();
-      showToast('Reset to default BUET Level-2 Term-1 seed dataset.');
+      showToast('Reset to default BUET L2T1 seed data');
+      setShowSettingsModal(false);
     }
   };
 
@@ -206,190 +209,141 @@ export function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white space-y-4">
-        <div className="relative">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-600 to-amber-700 flex items-center justify-center text-white font-black text-2xl shadow-2xl shadow-red-950/80 animate-pulse">
-            BU
-          </div>
-          <div className="absolute inset-0 rounded-2xl border-2 border-red-500 animate-ping opacity-25" />
+      <div className="min-h-screen bg-[#080b11] flex flex-col items-center justify-center text-white space-y-4">
+        <div className="w-10 h-10 rounded-2xl bg-red-900/60 border border-red-700/60 flex items-center justify-center text-white font-bold text-sm tracking-tight animate-pulse shadow-lg">
+          BU
         </div>
-        <div className="text-center space-y-1">
-          <h2 className="text-base font-bold text-white tracking-wide">Loading BUETracker Academic Suite...</h2>
-          <p className="text-xs text-slate-400 font-mono">Initializing Local SQLite/IndexedDB & Ordinance Engine</p>
-        </div>
+        <p className="text-xs text-slate-400 font-medium">Initializing BUETracker...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans selection:bg-red-900 selection:text-white">
-      {/* Top Application Header / Navbar with Ultra-Smooth Glassmorphism */}
-      <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-2xl border-b border-white/5 shadow-2xl no-print">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-4">
-          {/* Logo & Student Info Capsule */}
+    <div className="min-h-screen bg-[#080b11] text-slate-200 flex flex-col font-sans selection:bg-red-900/60 selection:text-white">
+      {/* Sleek, Single-Row Header */}
+      <header className="sticky top-0 z-40 bg-[#080b11]/90 backdrop-blur-xl border-b border-white/[0.08] no-print">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+          {/* Left: Brand Monogram + Title */}
           <div className="flex items-center gap-3">
-            <div className="relative group cursor-pointer" onClick={() => setShowTutorial(true)}>
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-red-700 via-red-800 to-amber-900 border border-red-500/40 flex items-center justify-center text-white shadow-lg shadow-red-950/80 font-black text-lg tracking-tighter transition group-hover:scale-105">
-                BU
-              </div>
-              <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-slate-950 flex items-center justify-center" title="Offline Database Active">
-                <span className="w-1.5 h-1.5 rounded-full bg-white" />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-base font-black tracking-tight text-white flex items-center">
-                  BUE<span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-400">Tracker</span>
-                </span>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-red-950/90 text-red-300 border border-red-800/80 shadow-sm">
-                  BUET Suite
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 font-medium">
-                {settings.studentName} ({settings.studentId}) • {settings.department}
-              </p>
-            </div>
-          </div>
-
-          {/* Academic Highlights Live Pills */}
-          <div className="flex items-center gap-3">
-            <div className="hidden md:flex items-center gap-2 bg-slate-900/90 px-3.5 py-1.5 rounded-xl border border-slate-800 text-xs shadow-sm">
-              <span className="text-slate-400 font-medium">Term:</span>
-              <span className="font-bold text-blue-400 font-mono">
-                {settings.currentSemesterId} (L2T1)
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 bg-slate-900/90 px-3.5 py-1.5 rounded-xl border border-slate-800 text-xs shadow-sm">
-              <Award className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-slate-400 font-medium">CGPA:</span>
-              <span className="font-black text-emerald-400 font-mono text-sm">
-                {overallCgpa.gpa.toFixed(2)}
-              </span>
-              <span className="text-[10px] text-slate-500 font-mono">({overallCgpa.earnedCredits} cr)</span>
-            </div>
-          </div>
-
-          {/* Action Center (App Tour, Backup, Shortcuts, Reset) */}
-          <div className="flex items-center gap-2">
-            {/* Interactive App Tour Button */}
-            <button
+            <div
               onClick={() => setShowTutorial(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-950/80 to-amber-950/80 hover:from-red-900/90 hover:to-amber-900/90 text-amber-300 border border-amber-700/50 transition shadow-sm text-xs font-bold"
-              title="Launch Interactive Step-by-Step Tutorial"
+              className="w-8 h-8 rounded-xl bg-gradient-to-br from-red-900 to-red-950 border border-red-700/70 flex items-center justify-center text-red-200 font-bold text-xs tracking-tight cursor-pointer hover:border-red-500 transition shadow-sm"
+              title="Open Interactive App Tour"
             >
-              <GraduationCap className="w-4 h-4 text-amber-400" />
-              <span className="hidden sm:inline">App Tour</span>
-            </button>
+              BU
+            </div>
 
-            <button
-              onClick={() => setShowShortcutsModal(true)}
-              className="p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 transition shadow-sm"
-              title="Keyboard Shortcuts (Ctrl+S, Ctrl+E, Ctrl+P)"
-            >
-              <Keyboard className="w-4 h-4 text-blue-400" />
-            </button>
-
-            <button
-              onClick={handleExportBackup}
-              className="p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 transition shadow-sm"
-              title="Backup Data as JSON"
-            >
-              <Download className="w-4 h-4 text-emerald-400" />
-            </button>
-
-            <label
-              className="p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 transition shadow-sm cursor-pointer"
-              title="Restore Data from JSON"
-            >
-              <Upload className="w-4 h-4 text-purple-400" />
-              <input
-                id="restore-file-input"
-                type="file"
-                accept=".json"
-                onChange={handleRestoreBackup}
-                className="hidden"
-              />
-            </label>
-
-            <button
-              onClick={handleResetToSeeds}
-              className="p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 transition shadow-sm"
-              title="Reset to BUET Seed Data"
-            >
-              <RotateCcw className="w-4 h-4 text-amber-400" />
-            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold tracking-tight text-white">
+                BUE<span className="text-red-500">Tracker</span>
+              </span>
+              <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded-md bg-white/[0.04] text-[10px] text-slate-400 font-mono border border-white/[0.06]">
+                {settings.currentSemesterId}
+              </span>
+            </div>
           </div>
-        </div>
 
-        {/* Modern Segmented Tab Controller Bar */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-1 pb-2">
-          <div className="flex gap-1.5 p-1 bg-slate-950/80 rounded-2xl border border-white/5 overflow-x-auto">
+          {/* Center: Tactile Segmented Navigation Bar */}
+          <nav className="flex items-center p-1 rounded-xl bg-white/[0.03] border border-white/[0.07]">
             <button
               onClick={() => setActiveTab('routine')}
-              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition duration-150 ${
                 activeTab === 'routine'
-                  ? 'bg-gradient-to-r from-red-600 to-rose-700 text-white shadow-lg shadow-red-950/80 border border-red-500/40'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                  ? 'bg-white/10 text-white font-semibold shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'
               }`}
             >
-              <Calendar className="w-4 h-4" />
-              <span>1. Routine Designer</span>
-              <span className="text-[10px] opacity-75 font-mono">Sat–Wed</span>
+              <Calendar className="w-3.5 h-3.5 text-red-400" />
+              <span>Routine</span>
             </button>
 
             <button
               onClick={() => setActiveTab('assessment')}
-              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition duration-150 ${
                 activeTab === 'assessment'
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg shadow-blue-950/80 border border-blue-500/40'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                  ? 'bg-white/10 text-white font-semibold shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'
               }`}
             >
-              <Calculator className="w-4 h-4" />
-              <span>2. BUET Assessment Engine</span>
-              <span className="text-[10px] opacity-75 font-mono">30% + 70%</span>
+              <Calculator className="w-3.5 h-3.5 text-blue-400" />
+              <span>Assessment</span>
             </button>
 
             <button
               onClick={() => setActiveTab('courses')}
-              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition duration-150 ${
                 activeTab === 'courses'
-                  ? 'bg-gradient-to-r from-purple-600 to-violet-700 text-white shadow-lg shadow-purple-950/80 border border-purple-500/40'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                  ? 'bg-white/10 text-white font-semibold shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'
               }`}
             >
-              <BookOpen className="w-4 h-4" />
-              <span>3. Course & BIIS Manager</span>
-              <span className="text-[10px] opacity-75 font-mono">L1T1–L4T2</span>
+              <BookOpen className="w-3.5 h-3.5 text-purple-400" />
+              <span>Courses</span>
             </button>
 
             <button
               onClick={() => setActiveTab('analytics')}
-              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition duration-150 ${
                 activeTab === 'analytics'
-                  ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-lg shadow-emerald-950/80 border border-emerald-500/40'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                  ? 'bg-white/10 text-white font-semibold shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'
               }`}
             >
-              <BarChart3 className="w-4 h-4" />
-              <span>4. Analytics & CGPA</span>
-              <span className="text-[10px] opacity-75 font-mono">Forecast</span>
+              <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Analytics</span>
+            </button>
+          </nav>
+
+          {/* Right: Student Profile & Settings */}
+          <div className="flex items-center gap-2.5">
+            {/* Student & CGPA pill */}
+            <div
+              onClick={() => setShowSettingsModal(true)}
+              className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-xs cursor-pointer transition"
+              title="Click to view Student Profile & Settings"
+            >
+              <div className="w-5 h-5 rounded-full bg-red-950 text-red-300 font-bold text-[10px] flex items-center justify-center border border-red-800">
+                {settings.studentName.charAt(0)}
+              </div>
+              <span className="text-slate-300 font-medium">{settings.studentName.split(' ')[0]}</span>
+              <span className="text-slate-600">•</span>
+              <div className="flex items-center gap-1.5 text-emerald-400 font-mono font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>{overallCgpa.gpa.toFixed(2)} CGPA</span>
+              </div>
+            </div>
+
+            {/* Guided Tour Pill */}
+            <button
+              onClick={() => setShowTutorial(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-950/60 to-red-900/40 hover:from-red-950 hover:to-red-900/60 text-red-200 border border-red-800/60 text-xs font-medium shadow-xs transition"
+              title="Launch Guided App Tour"
+            >
+              <GraduationCap className="w-3.5 h-3.5 text-red-400" />
+              <span className="hidden sm:inline">Tour</span>
+            </button>
+
+            {/* Unified Settings Gear */}
+            <button
+              onClick={() => setShowSettingsModal(true)}
+              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] border border-transparent hover:border-white/[0.08] transition"
+              title="Open Settings, Backups, and Shortcuts"
+            >
+              <Settings className="w-4 h-4" />
             </button>
           </div>
         </div>
       </header>
 
-      {/* Toast Notification Banner */}
+      {/* Floating Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900/95 border border-slate-700/80 text-white px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2.5 animate-slide-up no-print backdrop-blur-md">
-          <Sparkles className="w-4 h-4 text-amber-400" />
-          <span className="text-xs font-medium">{toastMessage}</span>
+        <div className="fixed bottom-5 right-5 z-50 bg-[#121624] border border-white/12 text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs font-medium animate-slide-up no-print">
+          <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+          <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Main Content Area */}
+      {/* Main Workspace */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 animate-fade-in">
         {activeTab === 'routine' && (
           <RoutineDesigner
@@ -426,31 +380,29 @@ export function App() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-white/5 bg-slate-950/90 py-3.5 px-6 text-center text-xs text-slate-500 no-print">
+      {/* Minimal Footer */}
+      <footer className="border-t border-white/[0.04] py-3.5 px-6 text-center text-xs text-slate-500 no-print">
         <div className="flex flex-wrap items-center justify-between max-w-7xl mx-auto gap-4">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span>Local Database Synced • 100% Offline Compatible</span>
+          <div className="flex items-center gap-2 text-[11px]">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <span>Local SQLite/IndexedDB Active • Fully Offline</span>
           </div>
-          <div>
-            BUETracker • Built for Bangladesh University of Engineering and Technology (BUET) Students
+          <div className="text-[11px] text-slate-500">
+            BUETracker • Bangladesh University of Engineering and Technology
           </div>
-          <div className="flex items-center gap-3">
-            <span>BUET Ordinance Compliant</span>
-            <span>•</span>
+          <div className="flex items-center gap-3 text-[11px]">
             <button
               onClick={() => setShowTutorial(true)}
-              className="text-amber-400 hover:text-amber-300 font-semibold"
+              className="text-slate-400 hover:text-slate-200 transition font-medium"
             >
               App Tour
             </button>
             <span>•</span>
             <button
-              onClick={() => setShowShortcutsModal(true)}
-              className="hover:text-slate-300 underline"
+              onClick={() => setShowSettingsModal(true)}
+              className="text-slate-400 hover:text-slate-200 transition font-medium"
             >
-              Shortcuts
+              Preferences & Data
             </button>
           </div>
         </div>
@@ -463,64 +415,20 @@ export function App() {
         onSelectTab={(tab) => setActiveTab(tab)}
       />
 
-      {/* Keyboard Shortcuts Modal */}
-      {showShortcutsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in no-print">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl p-6 max-w-md w-full shadow-2xl text-white space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold flex items-center gap-2">
-                <Keyboard className="w-5 h-5 text-blue-400" />
-                Desktop Shortcuts & Controls
-              </h3>
-              <button
-                onClick={() => setShowShortcutsModal(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-2.5 text-xs">
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-slate-700/60">
-                <span className="text-slate-300">Quick Save & Local Sync</span>
-                <kbd className="px-2 py-1 rounded-lg bg-slate-900 text-blue-400 font-mono font-bold border border-slate-700">
-                  Ctrl + S
-                </kbd>
-              </div>
-
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-slate-700/60">
-                <span className="text-slate-300">Switch to Routine & Export</span>
-                <kbd className="px-2 py-1 rounded-lg bg-slate-900 text-blue-400 font-mono font-bold border border-slate-700">
-                  Ctrl + E
-                </kbd>
-              </div>
-
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-slate-700/60">
-                <span className="text-slate-300">Print Routine (Landscape)</span>
-                <kbd className="px-2 py-1 rounded-lg bg-slate-900 text-blue-400 font-mono font-bold border border-slate-700">
-                  Ctrl + P
-                </kbd>
-              </div>
-
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-slate-700/60">
-                <span className="text-slate-300">Toggle Full Screen</span>
-                <kbd className="px-2 py-1 rounded-lg bg-slate-900 text-blue-400 font-mono font-bold border border-slate-700">
-                  F11
-                </kbd>
-              </div>
-            </div>
-
-            <div className="pt-2 flex justify-end">
-              <button
-                onClick={() => setShowShortcutsModal(false)}
-                className="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-500 transition"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Settings & Preferences Modal */}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        settings={settings}
+        onUpdateSettings={handleUpdateSettings}
+        onExportBackup={handleExportBackup}
+        onRestoreBackup={handleRestoreBackup}
+        onResetSeeds={handleResetToSeeds}
+        onOpenTutorial={() => {
+          setShowSettingsModal(false);
+          setShowTutorial(true);
+        }}
+      />
     </div>
   );
 }
