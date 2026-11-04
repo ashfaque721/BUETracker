@@ -180,12 +180,31 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
         ];
       }
     } else {
-      // Non-freshman: Ingest courses detected from Screenshot OCR
-      if (ingestMethod === 'screenshot' && confirmedCourses.length > 0) {
+      // Non-freshman: Ingest courses detected from Screenshot OCR or Preset
+      if (confirmedCourses.length > 0) {
         const targetPrevSemId = previousSemesters[previousSemesters.length - 1]?.id || 'L1T1';
         initialCourses = confirmedCourses.map((parsed) =>
           convertParsedCourseToAppCourse(parsed, targetPrevSemId, false)
         );
+      } else if (ingestMethod === 'quick_gpa') {
+        const targetPrevSemId = previousSemesters[previousSemesters.length - 1]?.id || 'L1T1';
+        const parsedGpa = parseFloat(quickCgpa) || 3.75;
+        const parsedCredits = parseFloat(quickCredits) || 38.0;
+        initialCourses = [
+          {
+            id: `course_prev_summary_${Date.now()}`,
+            code: 'PREV 001',
+            title: 'Previous Academic Completed Credits',
+            nickname: 'Prior Terms',
+            credits: parsedCredits,
+            type: 'theory',
+            semesterId: targetPrevSemId,
+            color: '#10b981',
+            isOngoing: false,
+            grade: 'A',
+            gradePoint: parsedGpa,
+          },
+        ];
       }
     }
 
@@ -523,6 +542,7 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
                   setConfirmedCourses(courses);
                   setScanSummary(summary);
                 }}
+                onAutoSubmit={handleFinalizeSetup}
               />
             )}
 

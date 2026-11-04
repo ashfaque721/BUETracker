@@ -1,4 +1,5 @@
 import type { Course, CourseType } from '../types';
+import { matchBuetCourse } from './buetCatalog';
 
 export interface ParsedBIISCourse {
   code: string;
@@ -33,42 +34,6 @@ const GRADE_POINT_MAP: Record<string, number> = {
   'X': 0.00,
 };
 
-// Course code pattern: 2 to 5 letters followed by optional space and 3 to 4 digits (anywhere on line)
-const COURSE_CODE_REGEX = /\b([A-Z]{2,5})\s*[-_]?\s*(\d{3,4})\b/i;
-
-const BUET_DEPT_PREFIXES = [
-  'CHEM', 'PHY', 'MATH', 'HUM', 'ME', 'IPE', 'EEE', 'CSE', 'CE', 'ChE', 'BME', 'NAME', 'MME', 'URP', 'WRE', 'ARCH', 'SHOP'
-];
-
-const BUET_TITLE_MAP = [
-  { match: /inorganic|quantitative|chemistry/i, dept: 'CHEM' },
-  { match: /english|language|sociology|economics|society/i, dept: 'HUM' },
-  { match: /calculus|differential|integral|linear|algebra|statistics/i, dept: 'MATH' },
-  { match: /cost|management|accounting|production|industrial/i, dept: 'IPE' },
-  { match: /drawing|machine tools|mechanics|thermal/i, dept: 'ME' },
-  { match: /physics|matter|optics|magnetism|electricity/i, dept: 'PHY' },
-  { match: /shop|foundry|welding/i, dept: 'SHOP' },
-  { match: /circuit|electronics|electrical|signals/i, dept: 'EEE' },
-  { match: /programming|computer|algorithm|data structure/i, dept: 'CSE' },
-  { match: /civil|surveying|structural|concrete/i, dept: 'CE' },
-];
-
-const STANDARD_CREDITS = [0.75, 1.50, 2.00, 3.00, 4.00, 6.00];
-
-function snapCredit(val: number): number {
-  if (isNaN(val) || val <= 0) return 3.0;
-  let closest = STANDARD_CREDITS[0];
-  let minDiff = Math.abs(val - closest);
-  for (const c of STANDARD_CREDITS) {
-    const diff = Math.abs(val - c);
-    if (diff < minDiff) {
-      minDiff = diff;
-      closest = c;
-    }
-  }
-  return closest;
-}
-
 const GP_TO_GRADE_MAP: Record<number, string> = {
   4.00: 'A+',
   3.75: 'A',
@@ -82,7 +47,30 @@ const GP_TO_GRADE_MAP: Record<number, string> = {
   0.00: 'F',
 };
 
-function snapGradePoint(val: number): number {
+// Course code pattern: 2 to 5 letters followed by optional space and 3 to 4 digits (anywhere on line)
+const COURSE_CODE_REGEX = /\b([A-Z]{2,5})\s*[-_]?\s*(\d{3,4})\b/i;
+
+const BUET_DEPT_PREFIXES = [
+  'CHEM', 'PHY', 'MATH', 'HUM', 'ME', 'IPE', 'EEE', 'CSE', 'CE', 'ChE', 'BME', 'NAME', 'MME', 'URP', 'WRE', 'ARCH', 'SHOP'
+];
+
+const STANDARD_CREDITS = [0.75, 1.50, 2.00, 3.00, 4.00, 6.00];
+
+export function snapCredit(val: number): number {
+  if (isNaN(val) || val <= 0) return 3.0;
+  let closest = STANDARD_CREDITS[0];
+  let minDiff = Math.abs(val - closest);
+  for (const c of STANDARD_CREDITS) {
+    const diff = Math.abs(val - c);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closest = c;
+    }
+  }
+  return closest;
+}
+
+export function snapGradePoint(val: number): number {
   const gps = [4.00, 3.75, 3.50, 3.25, 3.00, 2.75, 2.50, 2.25, 2.00, 0.00];
   let closest = gps[0];
   let minDiff = Math.abs(val - closest);
@@ -101,16 +89,26 @@ export function cleanOcrArtifacts(line: string): string {
     .replace(/[\|\[\]\{\}]/g, ' ')
     // Fix comma in decimals like 3,00 or 4,20
     .replace(/(\d),(\d{2})/g, '$1.$2')
+    // Fix common OCR dept typos
+    .replace(/\bCH[z3]M\b/gi, 'CHEM')
+    .replace(/\b[F~]UM\b/gi, 'HUM')
+    .replace(/\bFUR\b/gi, 'HUM')
+    .replace(/\bHJM\b/gi, 'HUM')
+    .replace(/\b\*ATH\b/gi, 'MATH')
+    .replace(/\bMTH\b/gi, 'MATH')
+    .replace(/\bSLY\b/gi, 'PHY')
+    .replace(/\bSHP\b/gi, 'SHOP')
     // Fix OCR typos in grade symbols
     .replace(/\bA\s*[\+\=\~]\b/gi, 'A+')
     .replace(/\bB\s*[\+\=\~]\b/gi, 'B+')
     .replace(/\bC\s*[\+\=\~]\b/gi, 'C+')
     .replace(/\b[28]\s*[\+\=\~]\b/gi, 'B+')
-    .replace(/\b[38]\s*[\-]\b/gi, 'B-')
+    .replace(/\b[238]\s*[\-]\b/gi, 'B-')
     .replace(/\bA\s*-\b/gi, 'A-')
     .replace(/\bB\s*-\b/gi, 'B-')
     .replace(/\bC\s*-\b/gi, 'C-')
-    // Fix course numbers with letter O/C like 1C5 -> 105, 1O5 -> 105
+    .replace(/\bE\+\b/gi, 'B+')
+    // Fix course numbers with letter O/C like 1C5 -> 105, 1O5 -> 105, 1C2 -> 102
     .replace(/\b([1-4])[OCoc](\d)\b/g, '$10$2')
     .replace(/\b([0-4])\.[O0][O0]\b/gi, '$1.00')
     .replace(/\b[O0]\.75\b/gi, '0.75')
@@ -177,17 +175,7 @@ export function parseBIISText(text: string): BIISParseResult {
       let rawPrefix = line.substring(0, numIdx).replace(/[^A-Za-z]/g, '').toUpperCase();
       afterCode = line.substring(numIdx + numMatch[0].length).trim();
 
-      // Resolve department from known prefixes or title keywords
       let resolvedDept = BUET_DEPT_PREFIXES.find((d) => d === rawPrefix);
-      if (!resolvedDept) {
-        for (const rule of BUET_TITLE_MAP) {
-          if (rule.match.test(afterCode)) {
-            resolvedDept = rule.dept;
-            break;
-          }
-        }
-      }
-
       if (!resolvedDept) resolvedDept = rawPrefix || 'COURSE';
       fullCode = `${resolvedDept} ${courseNum}`;
     }
@@ -221,7 +209,6 @@ export function parseBIISText(text: string): BIISParseResult {
 
     // Approach 2: Fallback search if table tokens are scattered or OCR noisy
     if (!matchedBackwards) {
-      // Find Grade Point (e.g. 3.75, 4.00, etc.)
       const gpMatches = [...afterCode.matchAll(/\b([0-4]\.\d{1,2})\b/g)];
       if (gpMatches.length > 0) {
         const lastGp = parseFloat(gpMatches[gpMatches.length - 1][1]);
@@ -242,7 +229,6 @@ export function parseBIISText(text: string): BIISParseResult {
         }
       }
 
-      // Check explicit grade match if still unconfirmed
       const grMatch = afterCode.match(/(?:^|\s)(A\+|A-|A|B\+|B-|B|C\+|C|D|F|S|X)(?=\s|$)/);
       if (grMatch) {
         grade = grMatch[1];
@@ -266,12 +252,26 @@ export function parseBIISText(text: string): BIISParseResult {
       .replace(/\s{2,}/g, ' ')
       .trim();
 
-    if (!title || title.length < 2) {
+    // Check BUET Catalog Fuzzy Matcher
+    const catalogMatch = matchBuetCourse(fullCode, title);
+    if (catalogMatch) {
+      fullCode = catalogMatch.code;
+      title = catalogMatch.title;
+      credits = catalogMatch.credits;
+    } else if (!title || title.length < 2) {
       title = `Course ${fullCode}`;
     }
 
-    // Sessional classification in BUET (<=1.5 cr, even course number, or lab/sessional/shop keywords)
-    const isSessional = credits <= 1.5 || courseNum % 2 === 0 || /lab|sessional|drawing|shop|practice/i.test(title);
+    // Strict BUET Ordinance pairing: Grade Point dictates Grade
+    if (GP_TO_GRADE_MAP[gradePoint]) {
+      grade = GP_TO_GRADE_MAP[gradePoint];
+    }
+
+    const isSessional =
+      catalogMatch?.type === 'sessional' ||
+      credits <= 1.5 ||
+      courseNum % 2 === 0 ||
+      /lab|sessional|drawing|shop|practice/i.test(title);
     const type: CourseType = isSessional ? 'sessional' : 'theory';
 
     courses.push({

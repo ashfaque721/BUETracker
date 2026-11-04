@@ -8,13 +8,12 @@ import {
   RefreshCw,
   Trash2,
   Plus,
-  Eye,
-  FileImage,
-  Clipboard,
-  Info,
+  BookOpen,
+  ChevronDown,
 } from 'lucide-react';
-import { ParsedBIISCourse, BIISParseResult } from '../utils/biisParser';
+import { ParsedBIISCourse } from '../utils/biisParser';
 import { scanBIISScreenshot, generateSampleBIISScreenshot } from '../utils/ocrService';
+import { SEMESTER_PRESETS } from '../utils/buetCatalog';
 import { BUET_GRADE_SCALE } from '../types';
 
 interface BIISScreenshotScannerProps {
@@ -22,11 +21,13 @@ interface BIISScreenshotScannerProps {
     courses: ParsedBIISCourse[],
     summary: { termGpa?: number; totalCredits?: number }
   ) => void;
+  onAutoSubmit?: () => void;
   targetSemesterLabel?: string;
 }
 
 export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
   onConfirmCourses,
+  onAutoSubmit,
   targetSemesterLabel,
 }) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -38,6 +39,7 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
   const [totalCredits, setTotalCredits] = useState<number>(0);
   const [termGpa, setTermGpa] = useState<number | undefined>(undefined);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [showPresetDropdown, setShowPresetDropdown] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropzoneRef = useRef<HTMLDivElement>(null);
@@ -60,9 +62,8 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
       setIsScanning(true);
       setErrorMessage(null);
       setScanProgress(5);
-      setScanStatusText('Preparing image for OCR...');
+      setScanStatusText('Preparing image for high-precision scan...');
 
-      // If File/Blob, generate preview
       if (typeof imageSrc !== 'string') {
         const previewUrl = URL.createObjectURL(imageSrc);
         setImagePreview(previewUrl);
@@ -70,14 +71,14 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
         setImagePreview(imageSrc);
       }
 
-      const { rawText, result } = await scanBIISScreenshot(imageSrc, (pct, msg) => {
+      const { result } = await scanBIISScreenshot(imageSrc, (pct, msg) => {
         setScanProgress(pct);
         setScanStatusText(msg);
       });
 
       if (!result.success || result.courses.length === 0) {
         setErrorMessage(
-          'Could not detect courses clearly in this screenshot. Please make sure the table with Course No, Credits, and Grades is clearly visible, or try our sample screenshot.'
+          'Could not detect courses clearly in this screenshot. Please ensure the BIIS table is visible, or select a standard semester preset template.'
         );
         setIsScanning(false);
         return;
@@ -104,6 +105,31 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
       setErrorMessage(err.message || 'Failed to scan image. Please try again.');
       setIsScanning(false);
     }
+  };
+
+  // Handle Preset Template Selection
+  const handleSelectPreset = (presetId: string) => {
+    const preset = SEMESTER_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+
+    const courses: ParsedBIISCourse[] = preset.courses.map((c) => ({
+      code: c.code,
+      title: c.title,
+      credits: c.credits,
+      grade: 'A+',
+      gradePoint: 4.0,
+      type: c.type,
+    }));
+
+    setDetectedCourses(courses);
+    setImagePreview(null);
+    setShowPresetDropdown(false);
+    recalculateSummary(courses);
+
+    onConfirmCourses(courses, {
+      termGpa: 4.0,
+      totalCredits: Number(preset.courses.reduce((acc, c) => acc + c.credits, 0).toFixed(2)),
+    });
   };
 
   // Handle Clipboard Paste (Ctrl+V)
@@ -180,6 +206,18 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
         }
       }
 
+      // If gradePoint changed, sync grade
+      if (field === 'gradePoint') {
+        const val = parseFloat(value);
+        if (!isNaN(val)) {
+          target.gradePoint = val;
+          const match = BUET_GRADE_SCALE.find((s) => Math.abs(s.gradePoint - val) < 0.05);
+          if (match) {
+            target.grade = match.grade;
+          }
+        }
+      }
+
       // If credits changed, ensure number
       if (field === 'credits') {
         target.credits = Number(value) || 0;
@@ -187,6 +225,7 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
 
       updated[index] = target;
       recalculateSummary(updated);
+      onConfirmCourses(updated, { termGpa, totalCredits });
       return updated;
     });
   };
@@ -195,6 +234,7 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
     setDetectedCourses((prev) => {
       const updated = prev.filter((_, i) => i !== index);
       recalculateSummary(updated);
+      onConfirmCourses(updated, { termGpa, totalCredits });
       return updated;
     });
   };
@@ -211,6 +251,7 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
     setDetectedCourses((prev) => {
       const updated = [...prev, newCourse];
       recalculateSummary(updated);
+      onConfirmCourses(updated, { termGpa, totalCredits });
       return updated;
     });
   };
@@ -218,6 +259,9 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
   const handleConfirm = () => {
     if (detectedCourses.length === 0) return;
     onConfirmCourses(detectedCourses, { termGpa, totalCredits });
+    if (onAutoSubmit) {
+      onAutoSubmit();
+    }
   };
 
   const handleReset = () => {
@@ -229,8 +273,8 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* INITIAL / DROPZONE STATE (No Image or Errored) */}
-      {!imagePreview && (
+      {/* INITIAL / DROPZONE STATE (No Image & No Detected Courses) */}
+      {!imagePreview && detectedCourses.length === 0 && (
         <div
           ref={dropzoneRef}
           onDragOver={handleDragOver}
@@ -260,9 +304,8 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
                 Paste Screenshot or Drop Image
               </h3>
               <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto leading-relaxed">
-                Press <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 border border-white/10 font-mono text-[10px] text-zinc-300">Win + Shift + S</kbd> to snip your BIIS result table on{' '}
-                <span className="text-emerald-400 font-mono">biis.buet.ac.bd</span>, then press{' '}
-                <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 border border-white/10 font-mono text-[10px] text-emerald-300 font-bold">Ctrl + V</kbd> anywhere!
+                Take a snippet of your BIIS table with <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 border border-white/10 font-mono text-[10px] text-zinc-300">Win + Shift + S</kbd>, then press{' '}
+                <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 border border-white/10 font-mono text-[10px] text-emerald-300 font-bold">Ctrl + V</kbd>!
               </p>
             </div>
 
@@ -282,8 +325,41 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 text-xs font-semibold border border-emerald-800/60 transition btn-tactile"
               >
                 <Sparkles className="w-4 h-4 text-emerald-400" />
-                <span>Try Sample BIIS Screenshot</span>
+                <span>Try Sample BIIS Sheet</span>
               </button>
+
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowPresetDropdown(!showPresetDropdown)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-950/60 hover:bg-blue-900/80 text-blue-300 text-xs font-semibold border border-blue-800/60 transition btn-tactile"
+                >
+                  <BookOpen className="w-4 h-4 text-blue-400" />
+                  <span>Select Semester Preset</span>
+                  <ChevronDown className="w-3.5 h-3.5 opacity-70" />
+                </button>
+
+                {showPresetDropdown && (
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-72 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl p-2 z-20 space-y-1 text-left animate-modal-in">
+                    <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 py-1 block">
+                      Common BUET Curricula (1-Click)
+                    </span>
+                    {SEMESTER_PRESETS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => handleSelectPreset(preset.id)}
+                        className="w-full px-2.5 py-1.5 rounded-xl hover:bg-zinc-800 text-zinc-200 text-xs font-medium text-left flex items-center justify-between transition"
+                      >
+                        <span>{preset.name}</span>
+                        <span className="text-[10px] font-mono text-emerald-400 font-bold">
+                          {preset.courses.length} crs
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -300,14 +376,13 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
                 className="w-full object-cover opacity-60 filter grayscale"
               />
             )}
-            {/* Animated Laser Scanning Line */}
             <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_#10b981] animate-pulse top-1/2 -translate-y-1/2" />
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center justify-center gap-2 text-emerald-400 font-semibold text-xs">
               <RefreshCw className="w-4 h-4 animate-spin" />
-              <span>Scanning Screenshot with Optical Character Recognition...</span>
+              <span>Scanning with Pixel Table Isolation & OCR...</span>
             </div>
 
             <p className="text-xs text-zinc-400">{scanStatusText}</p>
@@ -329,7 +404,7 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
           <div className="space-y-1.5 flex-1">
             <span className="font-semibold block">Scan Notice</span>
             <p className="text-red-300/90 leading-relaxed">{errorMessage}</p>
-            <div className="pt-1 flex gap-2">
+            <div className="pt-1 flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={handleReset}
@@ -343,6 +418,13 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
                 className="px-3 py-1 rounded-lg bg-emerald-950 hover:bg-emerald-900 text-emerald-300 font-medium text-[11px] transition border border-emerald-800"
               >
                 Use Crisp Sample Sheet
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectPreset('ipe_1_1')}
+                className="px-3 py-1 rounded-lg bg-blue-950 hover:bg-blue-900 text-blue-300 font-medium text-[11px] transition border border-blue-800"
+              >
+                Load Standard 1-1 Template
               </button>
             </div>
           </div>
@@ -360,10 +442,10 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
               </div>
               <div>
                 <span className="text-xs font-semibold text-zinc-100 block">
-                  Extracted {detectedCourses.length} Courses from Screenshot
+                  Extracted {detectedCourses.length} Courses Successfully
                 </span>
                 <span className="text-[11px] text-zinc-400">
-                  Target: {targetSemesterLabel || 'Previous Semester'} • Review & edit any value below
+                  Target: {targetSemesterLabel || 'Previous Semester'} • You can adjust grades/credits below
                 </span>
               </div>
             </div>
@@ -381,7 +463,7 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
                 type="button"
                 onClick={handleReset}
                 className="px-2.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium border border-white/10 transition btn-tactile"
-                title="Rescan another screenshot"
+                title="Rescan another screenshot or choose another template"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
               </button>
@@ -496,4 +578,3 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
     </div>
   );
 };
-
