@@ -21,6 +21,10 @@ import {
   ChevronRight,
   BookOpen,
   ArrowUpRight,
+  Sparkles,
+  Info,
+  Clock,
+  RotateCcw,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -39,6 +43,7 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
   const [selectedCourseId, setSelectedCourseId] = useState<string>(
     ongoingTheoryCourses[0]?.id || ''
   );
+  const [showSlabsModal, setShowSlabsModal] = useState(false);
 
   const selectedCourse = courses.find((c) => c.id === selectedCourseId);
 
@@ -67,6 +72,16 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
     });
   };
 
+  const handleResetAttendance = () => {
+    if (!selectedCourse) return;
+    if (window.confirm(`Reset attendance records for ${selectedCourse.code}?`)) {
+      onUpdateCourse({
+        ...selectedCourse,
+        attendance: { totalConducted: 0, attended: 0 },
+      });
+    }
+  };
+
   const handleAddClassTest = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCourse) return;
@@ -82,6 +97,7 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
       name: newCTName.trim() || `CT ${currentTests.length + 1}`,
       obtainedMarks: obtained,
       maxMarks: max,
+      date: new Date().toISOString().slice(0, 10),
     };
 
     onUpdateCourse({
@@ -97,31 +113,20 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
 
   const handleDeleteCT = (ctId: string) => {
     if (!selectedCourse) return;
-    const filtered = (selectedCourse.classTests || []).filter((t) => t.id !== ctId);
     onUpdateCourse({
       ...selectedCourse,
-      classTests: filtered,
+      classTests: (selectedCourse.classTests || []).filter((ct) => ct.id !== ctId),
     });
   };
 
-  const handleUpdateCT = (ctId: string, obtained: number, max: number) => {
+  const handleToggleCustomBestCount = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!selectedCourse) return;
-    const updated = (selectedCourse.classTests || []).map((t) =>
-      t.id === ctId ? { ...t, obtainedMarks: Math.max(0, obtained), maxMarks: Math.max(1, max) } : t
-    );
     onUpdateCourse({
       ...selectedCourse,
-      classTests: updated,
-    });
-  };
-
-  const handleToggleCustomBestCount = () => {
-    if (!selectedCourse) return;
-    const nextUseCustom = !selectedCourse.useCustomBestCount;
-    onUpdateCourse({
-      ...selectedCourse,
-      useCustomBestCount: nextUseCustom,
-      customBestCount: selectedCourse.customBestCount || Math.round(selectedCourse.credits),
+      useCustomBestCount: e.target.checked,
+      customBestCount: e.target.checked
+        ? selectedCourse.customBestCount || Math.round(selectedCourse.credits)
+        : undefined,
     });
   };
 
@@ -134,19 +139,23 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
   };
 
   const triggerCelebration = () => {
-    confetti({
-      particleCount: 80,
-      spread: 70,
-      origin: { y: 0.6 },
-    });
+    try {
+      confetti({
+        particleCount: 60,
+        spread: 70,
+        origin: { y: 0.6 },
+      });
+    } catch {}
   };
 
-  if (!selectedCourse && ongoingTheoryCourses.length === 0) {
+  if (ongoingTheoryCourses.length === 0) {
     return (
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-400 space-y-4">
-        <BookOpen className="w-12 h-12 text-slate-600 mx-auto" />
+      <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-12 text-center text-slate-300 space-y-4 max-w-xl mx-auto mt-8 shadow-2xl">
+        <div className="w-16 h-16 rounded-2xl bg-blue-950/60 border border-blue-800/80 text-blue-400 mx-auto flex items-center justify-center">
+          <BookOpen className="w-8 h-8" />
+        </div>
         <h3 className="text-lg font-bold text-white">No Ongoing Theory Courses Found</h3>
-        <p className="text-sm max-w-md mx-auto">
+        <p className="text-xs text-slate-400">
           Please add your current semester theory courses in the Course Manager or switch to Level-2 Term-1 to access continuous assessment calculations.
         </p>
       </div>
@@ -155,47 +164,75 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
 
   const assessment = selectedCourse ? evaluateCourseAssessment(selectedCourse) : null;
 
+  // BUET Official Attendance Slabs reference
+  const BUET_SLABS = [
+    { range: '≥ 90%', points: 10, marks: '100% of attendance marks' },
+    { range: '85% – 89%', points: 9, marks: '90% of attendance marks' },
+    { range: '80% – 84%', points: 8, marks: '80% of attendance marks' },
+    { range: '75% – 79%', points: 7, marks: '70% of attendance marks' },
+    { range: '70% – 74%', points: 6, marks: '60% of attendance marks' },
+    { range: '65% – 69%', points: 5, marks: '50% of attendance marks' },
+    { range: '60% – 64%', points: 4, marks: '40% of attendance marks' },
+    { range: '< 60%', points: 0, marks: '0 marks (Non-Collegiate / Ineligible)' },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-600 to-amber-700 flex items-center justify-center text-white shadow-lg shadow-red-950/40">
-            <Calculator className="w-6 h-6" />
+      {/* Top Banner & Course Selector Ribbon */}
+      <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800/80 p-5 rounded-3xl shadow-xl space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-800 border border-blue-500/30 flex items-center justify-center text-white shadow-lg shadow-blue-950/60">
+              <Calculator className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-black tracking-tight text-white">
+                  BUET Ordinance Assessment Engine
+                </h2>
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-blue-950 text-blue-300 border border-blue-800/80 font-mono">
+                  30% Continuous + 70% Final
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Attendance Slabs (10%) • Best n of n+1 CT Normalization (20%) • Term Final Section A/B Split (70%)
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl font-black text-white flex items-center gap-2">
-              BUET Ordinance Assessment Engine
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-red-950/90 text-red-300 border border-red-700/60 font-semibold font-mono">
-                Continuous 30% + Term Final 70%
-              </span>
-            </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Strictly ordinance-compliant: Attendance Slabs (10%), Best n of n+1 CTs (20%), and Term Final Section A & B Targets
-            </p>
-          </div>
+
+          <button
+            onClick={() => setShowSlabsModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+          >
+            <Info className="w-3.5 h-3.5 text-blue-400" />
+            <span>Attendance Slabs Chart</span>
+          </button>
         </div>
 
         {/* Course Selector Tabs */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex gap-2 overflow-x-auto pt-2 border-t border-slate-800/80 pb-1">
           {ongoingTheoryCourses.map((c) => {
             const isSelected = c.id === selectedCourseId;
+            const cAss = evaluateCourseAssessment(c);
             return (
               <button
                 key={c.id}
                 onClick={() => setSelectedCourseId(c.id)}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                className={`flex items-center gap-2.5 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all whitespace-nowrap border ${
                   isSelected
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40 border border-blue-400'
-                    : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 border border-slate-700/60'
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-950/80 border-blue-400'
+                    : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800 border-slate-700/60'
                 }`}
               >
                 <span
                   className="w-2.5 h-2.5 rounded-full"
                   style={{ backgroundColor: c.color || '#3b82f6' }}
                 />
-                <span>{c.code}</span>
-                <span className="text-[10px] opacity-80">({c.nickname || c.title})</span>
+                <span className="tracking-wide font-black">{c.code}</span>
+                <span className="text-[10px] opacity-80 font-medium">({c.nickname || c.title})</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-black/25">
+                  {cAss.attendance.percentage}%
+                </span>
               </button>
             );
           })}
@@ -204,13 +241,13 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
 
       {selectedCourse && assessment && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Column: Attendance & CT Engine (Continuous 30%) */}
+          {/* Left Column: Continuous Assessment (Attendance + CT = 30%) */}
           <div className="lg:col-span-6 space-y-6">
             {/* 1. Attendance Engine Card (10%) */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl p-6 shadow-xl space-y-5">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-lg bg-emerald-950/80 border border-emerald-700/50 text-emerald-400">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-emerald-950/80 border border-emerald-700/50 text-emerald-400">
                     <ShieldCheck className="w-5 h-5" />
                   </div>
                   <div>
@@ -218,17 +255,17 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                       1. Attendance Engine (10% Weight)
                     </h3>
                     <p className="text-xs text-slate-400 font-mono">
-                      Max Marks: {assessment.attendance.maxAttendanceMarks.toFixed(1)} (Credit × 10)
+                      Max Marks: {assessment.attendance.maxAttendanceMarks.toFixed(1)} (Credit: {selectedCourse.credits} × 10)
                     </p>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <div className="text-lg font-black text-emerald-400">
+                  <div className="text-lg font-black text-emerald-400 font-mono">
                     {assessment.attendance.attendanceMarks.toFixed(1)} / {assessment.attendance.maxAttendanceMarks.toFixed(1)}
                   </div>
-                  <div className="text-[10px] text-slate-400 font-semibold uppercase">
-                    Points: {assessment.attendance.slabPoints}/10
+                  <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                    Slab Points: {assessment.attendance.slabPoints}/10
                   </div>
                 </div>
               </div>
@@ -240,7 +277,7 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                     Attendance Percentage:
                   </span>
                   <span
-                    className={`font-mono font-bold text-sm ${
+                    className={`font-mono font-black text-base ${
                       assessment.attendance.percentage >= 90
                         ? 'text-emerald-400'
                         : assessment.attendance.percentage >= 75
@@ -255,7 +292,7 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                 </div>
 
                 {/* Progress Bar with 60% Danger Line and 90% Green Line */}
-                <div className="relative w-full h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                <div className="relative w-full h-3.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
                   <div
                     className={`h-full transition-all duration-500 rounded-full ${
                       assessment.attendance.percentage >= 90
@@ -292,13 +329,13 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
 
               {/* Non-Collegiate Alert if < 60% */}
               {assessment.attendance.isNonCollegiate && (
-                <div className="p-3 bg-red-950/80 border border-red-700 rounded-xl text-xs text-red-200 flex items-start gap-2.5 animate-pulse">
+                <div className="p-3.5 bg-red-950/80 border border-red-700/80 rounded-2xl text-xs text-red-200 flex items-start gap-2.5 animate-pulse">
                   <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold uppercase tracking-wider">
+                    <span className="font-bold uppercase tracking-wider text-red-300">
                       Ordinance Warning: Non-Collegiate / Ineligible!
                     </span>
-                    <p className="mt-0.5 text-red-300">
+                    <p className="mt-0.5 text-red-400/90 leading-relaxed">
                       Attendance is strictly below 60%. Under BUET ordinance, term final examination admit card cannot be issued without dean's fine/condonation.
                     </p>
                   </div>
@@ -307,43 +344,50 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
 
               {/* Attendance Analytics Metrics: Safe Bunks & Classes Needed */}
               <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/60">
+                <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
                   <span className="text-[11px] font-medium text-slate-400 block">
                     Safe Bunks Available
                   </span>
-                  <div className="flex items-baseline gap-1 mt-1">
-                    <span className="text-xl font-black text-amber-400 font-mono">
+                  <div className="flex items-baseline gap-1.5 mt-1">
+                    <span className={`text-2xl font-black font-mono ${
+                      assessment.attendance.safeBunksTo60 > 5
+                        ? 'text-emerald-400'
+                        : assessment.attendance.safeBunksTo60 > 1
+                        ? 'text-amber-400'
+                        : 'text-red-400'
+                    }`}>
                       {assessment.attendance.safeBunksTo60}
                     </span>
-                    <span className="text-xs text-slate-400">classes</span>
+                    <span className="text-xs text-slate-400 font-medium">classes</span>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-0.5">
+                  <p className="text-[10px] text-slate-500 mt-1">
                     Misses before falling below 60% Non-Collegiate
                   </p>
                 </div>
 
-                <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/60">
+                <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
                   <span className="text-[11px] font-medium text-slate-400 block">
                     Next Slab Target
                   </span>
                   {assessment.attendance.classesNeededForNextSlab !== null ? (
                     <div>
-                      <div className="flex items-baseline gap-1 mt-1">
-                        <span className="text-xl font-black text-emerald-400 font-mono">
+                      <div className="flex items-baseline gap-1.5 mt-1">
+                        <span className="text-2xl font-black text-blue-400 font-mono">
                           {assessment.attendance.classesNeededForNextSlab}
                         </span>
-                        <span className="text-xs text-slate-400">consecutive classes</span>
+                        <span className="text-xs text-slate-400 font-medium">classes</span>
                       </div>
-                      <p className="text-[10px] text-slate-500 mt-0.5">
-                        Needed to reach {assessment.attendance.nextSlabTargetPercent}% slab
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Needed for {assessment.attendance.nextSlabTargetPercent}% slab ({assessment.attendance.slabPoints + 1}/10)
                       </p>
                     </div>
                   ) : (
                     <div className="mt-1">
-                      <span className="text-xs font-bold text-emerald-400">
+                      <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
+                        <CheckCircle className="w-3.5 h-3.5" />
                         Top Slab Reached (10/10)
                       </span>
-                      <p className="text-[10px] text-slate-500 mt-0.5">
+                      <p className="text-[10px] text-slate-500 mt-1">
                         Can miss {assessment.attendance.safeBunksCurrentSlab} class(es) & keep 10/10
                       </p>
                     </div>
@@ -367,25 +411,32 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleAttendanceIncrement(1, 1)}
-                    className="px-2.5 py-1.5 rounded-lg bg-emerald-900/60 hover:bg-emerald-800 text-emerald-300 border border-emerald-700/60 font-semibold transition flex items-center gap-1"
+                    className="px-3 py-1.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/60 font-bold transition flex items-center gap-1 shadow-sm"
                   >
                     +1 Present
                   </button>
                   <button
                     onClick={() => handleAttendanceIncrement(1, 0)}
-                    className="px-2.5 py-1.5 rounded-lg bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800/60 font-semibold transition flex items-center gap-1"
+                    className="px-3 py-1.5 rounded-xl bg-red-950/80 hover:bg-red-900 text-red-300 border border-red-800/60 font-bold transition flex items-center gap-1 shadow-sm"
                   >
                     +1 Absent
+                  </button>
+                  <button
+                    onClick={handleResetAttendance}
+                    className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                    title="Reset Attendance"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
             </div>
 
             {/* 2. Class Test (CT) Engine Card (20%) */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl p-6 shadow-xl space-y-5">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-lg bg-blue-950/80 border border-blue-700/50 text-blue-400">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-blue-950/80 border border-blue-700/50 text-blue-400">
                     <Award className="w-5 h-5" />
                   </div>
                   <div>
@@ -403,87 +454,87 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                   <div className="text-lg font-black text-blue-400 font-mono">
                     {assessment.classTests.totalCTMarks.toFixed(1)} / {assessment.classTests.maxCTMarks.toFixed(1)}
                   </div>
-                  <div className="text-[10px] text-slate-400 font-semibold uppercase">
+                  <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                     Mean: {assessment.classTests.ctPercentage.toFixed(1)}%
                   </div>
                 </div>
               </div>
 
               {/* Best n override control */}
-              <div className="flex items-center justify-between text-xs bg-slate-800/40 p-2.5 rounded-xl border border-slate-700/50">
+              <div className="flex items-center justify-between text-xs bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     id="overrideBestN"
                     checked={!!selectedCourse.useCustomBestCount}
                     onChange={handleToggleCustomBestCount}
-                    className="rounded bg-slate-700 border-slate-600 text-blue-500 focus:ring-0"
+                    className="rounded bg-slate-800 border-slate-700 text-blue-500 focus:ring-0"
                   />
-                  <label htmlFor="overrideBestN" className="text-slate-300 cursor-pointer">
+                  <label htmlFor="overrideBestN" className="text-slate-300 font-medium cursor-pointer">
                     Manual Best Count Override
                   </label>
                 </div>
 
                 {selectedCourse.useCustomBestCount && (
                   <div className="flex items-center gap-2">
-                    <span className="text-slate-400">Take Best:</span>
+                    <span className="text-slate-400">Count Best:</span>
                     <input
                       type="number"
                       min={1}
                       max={10}
                       value={selectedCourse.customBestCount || Math.round(selectedCourse.credits)}
                       onChange={(e) => handleChangeCustomBestCount(parseInt(e.target.value, 10))}
-                      className="w-14 bg-slate-800 border border-slate-700 rounded px-2 py-0.5 text-white font-mono text-center focus:outline-none focus:border-blue-500"
+                      className="w-14 bg-slate-800 border border-slate-700 rounded-lg px-2 py-0.5 text-white font-mono text-center focus:outline-none focus:border-blue-500"
                     />
                   </div>
                 )}
               </div>
 
-              {/* Class Test List with Normalized scores and Best-k badges */}
-              <div className="space-y-2">
+              {/* Class Test List */}
+              <div className="space-y-2.5">
                 {assessment.classTests.tests.length === 0 ? (
                   <div className="text-center py-6 text-slate-500 text-xs">
-                    No Class Tests added yet. Click "+ Add Class Test" below.
+                    No Class Tests recorded yet. Click "+ Add Class Test" below.
                   </div>
                 ) : (
                   assessment.classTests.tests.map((test) => (
                     <div
                       key={test.id}
-                      className={`flex items-center justify-between p-3 rounded-xl border transition ${
+                      className={`flex items-center justify-between p-3.5 rounded-2xl border transition ${
                         test.isCounted
-                          ? 'bg-blue-950/30 border-blue-800/80'
-                          : 'bg-slate-800/30 border-slate-800 opacity-60'
+                          ? 'bg-blue-950/30 border-blue-800/80 shadow-xs'
+                          : 'bg-slate-950/40 border-slate-800/80 opacity-60'
                       }`}
                     >
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-white">{test.name}</span>
                           {test.isCounted ? (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700/60 font-semibold">
-                              ✓ Counted in Best {assessment.classTests.bestCount}
+                            <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700/60 font-bold">
+                              ✓ Best {assessment.classTests.bestCount} Counted
                             </span>
                           ) : (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 line-through">
-                              Dropped
+                            <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-semibold line-through">
+                              Lowest (Dropped)
                             </span>
                           )}
                         </div>
                         <div className="text-[11px] text-slate-400 font-mono">
-                          Raw: {test.obtainedMarks} / {test.maxMarks} ({test.percentage}%)
+                          Raw Score: {test.obtainedMarks} / {test.maxMarks} ({test.percentage}%)
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <div className="text-xs font-bold font-mono text-blue-300">
+                          <div className="text-xs font-black font-mono text-blue-300">
                             {test.normalizedScore.toFixed(1)} / 20.0
                           </div>
-                          <span className="text-[9px] text-slate-500">Normalized</span>
+                          <span className="text-[9px] text-slate-500 font-mono">Normalized</span>
                         </div>
 
                         <button
                           onClick={() => handleDeleteCT(test.id)}
-                          className="p-1 text-slate-500 hover:text-red-400 rounded transition"
+                          className="p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-slate-800 transition"
                           title="Delete CT"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -498,34 +549,34 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
               {isAddingCT ? (
                 <form
                   onSubmit={handleAddClassTest}
-                  className="bg-slate-800/70 p-3.5 rounded-xl border border-slate-700 space-y-3 animate-fade-in"
+                  className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800 space-y-3 animate-fade-in"
                 >
                   <div className="text-xs font-bold text-white">Add New Class Test</div>
                   <div className="grid grid-cols-3 gap-2">
                     <input
                       type="text"
-                      placeholder="e.g. CT 5 (Makeup)"
+                      placeholder="e.g. CT 4"
                       value={newCTName}
                       onChange={(e) => setNewCTName(e.target.value)}
-                      className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500"
+                      className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 font-medium"
                     />
                     <input
                       type="number"
                       step="0.5"
-                      placeholder="Obtained (e.g. 17)"
+                      placeholder="Obtained (e.g. 18)"
                       value={newCTObtained}
                       onChange={(e) => setNewCTObtained(e.target.value)}
                       required
-                      className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                      className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
                     />
                     <input
                       type="number"
                       step="0.5"
-                      placeholder="Max Marks"
+                      placeholder="Max (e.g. 20)"
                       value={newCTMax}
                       onChange={(e) => setNewCTMax(e.target.value)}
                       required
-                      className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                      className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
                     />
                   </div>
 
@@ -533,13 +584,13 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                     <button
                       type="button"
                       onClick={() => setIsAddingCT(false)}
-                      className="px-3 py-1 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
+                      className="px-3.5 py-1.5 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 font-medium"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      className="px-3 py-1 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-500"
+                      className="px-4 py-1.5 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-500 shadow-md"
                     >
                       Save CT
                     </button>
@@ -548,21 +599,21 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
               ) : (
                 <button
                   onClick={() => setIsAddingCT(true)}
-                  className="w-full py-2 border-2 border-dashed border-slate-800 hover:border-blue-600 rounded-xl text-xs font-semibold text-slate-400 hover:text-blue-400 transition flex items-center justify-center gap-1.5"
+                  className="w-full py-2.5 border-2 border-dashed border-slate-800 hover:border-blue-600 rounded-2xl text-xs font-bold text-slate-400 hover:text-blue-400 transition flex items-center justify-center gap-1.5"
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  Add Class Test (CT)
+                  <Plus className="w-4 h-4" />
+                  <span>Record New Class Test (CT)</span>
                 </button>
               )}
             </div>
           </div>
 
-          {/* Right Column: Term Final (TF) Target Matrix (70% Weight) */}
+          {/* Right Column: Term Final Target Matrix (70% Weight) */}
           <div className="lg:col-span-6 space-y-6">
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl p-6 shadow-xl space-y-5">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-lg bg-red-950/80 border border-red-700/50 text-red-400">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-red-950/80 border border-red-700/50 text-red-400">
                     <Flame className="w-5 h-5 text-amber-400" />
                   </div>
                   <div>
@@ -575,22 +626,21 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                   </div>
                 </div>
 
-                {/* Total Continuous Marks Secured */}
                 <div className="text-right">
                   <div className="text-xl font-black text-amber-400 font-mono">
                     {assessment.continuousMarksObtained.toFixed(1)} / {assessment.maxContinuousMarks.toFixed(1)}
                   </div>
-                  <div className="text-[10px] text-slate-400 font-semibold uppercase">
+                  <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                     Continuous Marks Secured (30%)
                   </div>
                 </div>
               </div>
 
               {/* Explanatory note */}
-              <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/50 text-xs text-slate-300 flex items-start gap-2">
+              <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 flex items-start gap-2.5 leading-relaxed">
                 <HelpCircle className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                 <p>
-                  At BUET, Term Final exam consists of <strong className="text-white">Section A</strong> and <strong className="text-white">Section B</strong> (50% each). The required score below shows exactly what you need in total and per section out of <span className="font-mono text-amber-300 font-bold">{(assessment.maxTFMarks / 2).toFixed(1)}</span>.
+                  At BUET, Term Final exam consists of <strong className="text-white">Section A</strong> and <strong className="text-white">Section B</strong> (50% each). The target matrix shows exactly what you need in total and per section out of <span className="font-mono text-amber-300 font-bold">{(assessment.maxTFMarks / 2).toFixed(1)}</span>.
                 </p>
               </div>
 
@@ -598,12 +648,12 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left">
                   <thead>
-                    <tr className="border-b border-slate-800 text-[11px] font-semibold text-slate-400">
-                      <th className="pb-2">Target Grade</th>
-                      <th className="pb-2 text-center">Needed in TF (70n)</th>
-                      <th className="pb-2 text-center">Required % in Exam</th>
-                      <th className="pb-2 text-center">Sec A & Sec B Targets</th>
-                      <th className="pb-2 text-right">Feasibility</th>
+                    <tr className="border-b border-slate-800 text-[11px] font-bold text-slate-400">
+                      <th className="pb-2.5">Target Grade</th>
+                      <th className="pb-2.5 text-center">Needed in TF (70n)</th>
+                      <th className="pb-2.5 text-center">Exam % Needed</th>
+                      <th className="pb-2.5 text-center">Sec A & Sec B Targets</th>
+                      <th className="pb-2.5 text-right">Feasibility</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 font-mono">
@@ -612,15 +662,21 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                       return (
                         <tr
                           key={target.grade}
-                          className={`hover:bg-slate-800/40 transition ${
+                          onClick={() => {
+                            if (target.status === 'achievable' || target.status === 'secured') {
+                              triggerCelebration();
+                            }
+                          }}
+                          className={`hover:bg-slate-800/40 transition cursor-pointer ${
                             isAPlus ? 'bg-red-950/20' : ''
                           }`}
+                          title="Click to celebrate / inspect target"
                         >
                           {/* Target Grade Badge */}
-                          <td className="py-2.5">
-                            <div className="flex items-center gap-1.5">
+                          <td className="py-3">
+                            <div className="flex items-center gap-2">
                               <span
-                                className={`px-2 py-0.5 rounded-md font-bold text-xs ${
+                                className={`px-2.5 py-0.5 rounded-lg font-black text-xs ${
                                   target.grade.startsWith('A')
                                     ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
                                     : target.grade.startsWith('B')
@@ -630,14 +686,14 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                               >
                                 {target.grade}
                               </span>
-                              <span className="text-[10px] text-slate-400 font-sans">
+                              <span className="text-[10px] text-slate-400 font-sans font-medium">
                                 ({target.gradePoint.toFixed(2)})
                               </span>
                             </div>
                           </td>
 
                           {/* TF Marks Needed */}
-                          <td className="py-2.5 text-center font-bold">
+                          <td className="py-3 text-center font-bold">
                             <span
                               className={
                                 target.status === 'secured'
@@ -651,62 +707,46 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                             </span>
                           </td>
 
-                          {/* Required % */}
-                          <td className="py-2.5 text-center">
+                          {/* Exam % */}
+                          <td className="py-3 text-center">
                             <span
-                              className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
-                                target.requiredTFPercentage <= 65
-                                  ? 'bg-emerald-950/80 text-emerald-300'
+                              className={`font-semibold ${
+                                target.requiredTFPercentage <= 70
+                                  ? 'text-emerald-400'
                                   : target.requiredTFPercentage <= 85
-                                  ? 'bg-blue-950/80 text-blue-300'
-                                  : target.requiredTFPercentage <= 100
-                                  ? 'bg-amber-950/80 text-amber-300'
-                                  : 'bg-red-950/80 text-red-400'
+                                  ? 'text-amber-400'
+                                  : 'text-red-400'
                               }`}
                             >
                               {target.requiredTFPercentage.toFixed(1)}%
                             </span>
                           </td>
 
-                          {/* Section A & Section B Split */}
-                          <td className="py-2.5 text-center">
-                            <div className="text-[11px] text-slate-300">
-                              <span className="text-blue-400 font-bold">A: {target.targetSectionA.toFixed(1)}</span>
-                              <span className="mx-1 text-slate-600">|</span>
-                              <span className="text-purple-400 font-bold">B: {target.targetSectionB.toFixed(1)}</span>
+                          {/* Sec A & B Split */}
+                          <td className="py-3 text-center">
+                            <div className="text-[11px] font-bold text-amber-300">
+                              {target.targetSectionA.toFixed(1)} + {target.targetSectionB.toFixed(1)}
                             </div>
+                            <span className="text-[9px] text-slate-500 font-sans">50/50 Split</span>
                           </td>
 
-                          {/* Status Badge */}
-                          <td className="py-2.5 text-right font-sans">
-                            {target.status === 'secured' && (
-                              <button
-                                onClick={triggerCelebration}
-                                className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700 hover:scale-105 transition"
-                                title="Click to celebrate!"
-                              >
-                                <CheckCircle className="w-3 h-3 text-emerald-400" />
-                                Secured! 🎉
-                              </button>
-                            )}
-                            {target.status === 'comfortable' && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-900/60 text-emerald-300 border border-emerald-700/60">
-                                Comfortable
+                          {/* Feasibility Tag */}
+                          <td className="py-3 text-right">
+                            {target.status === 'secured' ? (
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-400 border border-emerald-700/60 font-bold text-[10px] font-sans">
+                                ✓ Secured
                               </span>
-                            )}
-                            {target.status === 'achievable' && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-900/60 text-blue-300 border border-blue-700/60">
+                            ) : target.status === 'achievable' ? (
+                              <span className="px-2 py-0.5 rounded-md bg-blue-950 text-blue-400 border border-blue-700/60 font-bold text-[10px] font-sans">
                                 Achievable
                               </span>
-                            )}
-                            {target.status === 'demanding' && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-900/60 text-amber-300 border border-amber-700/60">
+                            ) : target.status === 'demanding' ? (
+                              <span className="px-2 py-0.5 rounded-md bg-amber-950 text-amber-400 border border-amber-700/60 font-bold text-[10px] font-sans">
                                 Demanding
                               </span>
-                            )}
-                            {target.status === 'impossible' && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-950 text-red-400 border border-red-800">
-                                Unreachable
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-md bg-red-950 text-red-400 border border-red-700/60 font-bold text-[10px] font-sans">
+                                Impossible
                               </span>
                             )}
                           </td>
@@ -717,68 +757,74 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                 </table>
               </div>
             </div>
+          </div>
+        </div>
+      )}
 
-            {/* Sessional / Lab Summary Overview */}
-            {ongoingSessionalCourses.length > 0 && (
-              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <CheckSquare className="w-4 h-4 text-purple-400" />
-                    Sessional / Lab Courses (Projected Grades)
-                  </h3>
-                  <span className="text-[10px] text-slate-400">
-                    Bypasses continuous attendance & CTs
-                  </span>
-                </div>
+      {/* BUET Attendance Slabs Reference Modal */}
+      {showSlabsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in no-print">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl p-6 max-w-lg w-full shadow-2xl text-white space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                Official BUET Attendance Slabs Ordinance
+              </h3>
+              <button
+                onClick={() => setShowSlabsModal(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
 
-                <div className="space-y-2">
-                  {ongoingSessionalCourses.map((s) => (
-                    <div
-                      key={s.id}
-                      className="p-2.5 bg-slate-800/40 border border-slate-700/60 rounded-xl flex items-center justify-between text-xs"
-                    >
-                      <div>
-                        <div className="font-bold text-white flex items-center gap-2">
-                          <span
-                            className="w-2 h-2 rounded-full"
-                            style={{ backgroundColor: s.color || '#a855f7' }}
-                          />
-                          <span>{s.code}</span>
-                          <span className="text-slate-400 font-normal">({s.title})</span>
-                        </div>
-                        {s.sessionalNotes && (
-                          <p className="text-[10px] text-slate-400 mt-0.5">{s.sessionalNotes}</p>
-                        )}
-                      </div>
+            <p className="text-xs text-slate-300">
+              For an $n$-credit course, total attendance marks = $n \times 10$. Points awarded correspond directly to official percentage slabs:
+            </p>
 
-                      <div className="flex items-center gap-2">
-                        <span className="text-slate-400">Projected GP:</span>
-                        <select
-                          value={s.projectedGradePoint ?? 4.0}
-                          onChange={(e) =>
-                            onUpdateCourse({
-                              ...s,
-                              projectedGradePoint: parseFloat(e.target.value),
-                            })
-                          }
-                          className="bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-xs font-mono font-bold text-emerald-400 focus:outline-none focus:border-blue-500"
-                        >
-                          <option value={4.0}>A+ (4.00)</option>
-                          <option value={3.75}>A (3.75)</option>
-                          <option value={3.5}>A- (3.50)</option>
-                          <option value={3.25}>B+ (3.25)</option>
-                          <option value={3.0}>B (3.00)</option>
-                        </select>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b border-slate-800 text-[11px] font-bold text-slate-400">
+                    <th className="pb-2">Attendance Range</th>
+                    <th className="pb-2 text-center">Slab Points</th>
+                    <th className="pb-2 text-right">Awarded Marks</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-mono">
+                  {BUET_SLABS.map((slab) => {
+                    const isCurrent = assessment && assessment.attendance.slabPoints === slab.points;
+                    return (
+                      <tr
+                        key={slab.range}
+                        className={`transition ${
+                          isCurrent ? 'bg-emerald-950/40 text-emerald-300 font-bold' : 'hover:bg-slate-800/40'
+                        }`}
+                      >
+                        <td className="py-2 flex items-center gap-2">
+                          {isCurrent && <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                          <span>{slab.range}</span>
+                        </td>
+                        <td className="py-2 text-center font-bold">{slab.points} / 10</td>
+                        <td className="py-2 text-right text-slate-400">{slab.marks}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-800">
+              <button
+                onClick={() => setShowSlabsModal(false)}
+                className="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-500"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
     </div>
   );
 };
-
