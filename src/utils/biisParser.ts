@@ -118,26 +118,32 @@ export function cleanOcrArtifacts(line: string): string {
 }
 
 export function parseBIISText(text: string): BIISParseResult {
-  const lines = text
+  if (!text || !text.trim()) {
+    return { success: false, courses: [], rawCount: 0, errors: ['Empty input text'] };
+  }
+
+  // Check for explicit GPA line e.g. "GPA: 3.59"
+  let sheetGpa: number | undefined = undefined;
+  const gpaMatch = text.match(/(?:CGPA|GPA)[:\s]+([0-4]\.\d{2})/i);
+  if (gpaMatch) {
+    sheetGpa = parseFloat(gpaMatch[1]);
+  }
+
+  const rawLines = text
     .split(/\r?\n/)
     .map((l) => cleanOcrArtifacts(l))
     .filter(Boolean);
+
   const courses: ParsedBIISCourse[] = [];
   const errors: string[] = [];
-  let sheetGpa: number | undefined = undefined;
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    // Check for explicit GPA line e.g. "GPA: 3.59"
-    const gpaMatch = line.match(/GPA[:\s]+([0-4]\.\d{2})/i);
-    if (gpaMatch) {
-      sheetGpa = parseFloat(gpaMatch[1]);
-      continue;
-    }
+  // Identify where each course block starts
+  const courseStartIndices: number[] = [];
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i];
+    const lower = line.toLowerCase();
 
     // Skip headers or administrative lines
-    const lower = line.toLowerCase();
     if (
       lower.includes('course no') ||
       lower.includes('course code') ||
@@ -154,134 +160,188 @@ export function parseBIISText(text: string): BIISParseResult {
       continue;
     }
 
-    // Try finding course code standard match
-    const codeMatch = line.match(COURSE_CODE_REGEX);
-    let fullCode = '';
-    let courseNum = 0;
-    let afterCode = '';
-
-    if (codeMatch) {
-      fullCode = `${codeMatch[1].toUpperCase()} ${codeMatch[2]}`;
-      courseNum = parseInt(codeMatch[2], 10);
-      const codeIndex = line.indexOf(codeMatch[0]);
-      afterCode = line.substring(codeIndex + codeMatch[0].length).trim();
-    } else {
-      // Fallback: search for course number (3 to 4 digits starting with 1-4)
-      const numMatch = line.match(/\b([1-4]\d{2,3})\b/);
-      if (!numMatch) continue;
-
-      courseNum = parseInt(numMatch[1], 10);
-      const numIdx = line.indexOf(numMatch[0]);
-      let rawPrefix = line.substring(0, numIdx).replace(/[^A-Za-z]/g, '').toUpperCase();
-      afterCode = line.substring(numIdx + numMatch[0].length).trim();
-
-      let resolvedDept = BUET_DEPT_PREFIXES.find((d) => d === rawPrefix);
-      if (!resolvedDept) resolvedDept = rawPrefix || 'COURSE';
-      fullCode = `${resolvedDept} ${courseNum}`;
+    if (COURSE_CODE_REGEX.test(line)) {
+      courseStartIndices.push(i);
     }
+  }
 
-    let credits = 3.0;
-    let grade = 'A+';
-    let gradePoint = 4.00;
-    let title = '';
+  if (courseStartIndices.length > 0) {
+    // Process each multi-line or single-line course block
+    for (let b = 0; b < courseStartIndices.length; b++) {
+      const startIdx = courseStartIndices[b];
+      const endIdx = b + 1 < courseStartIndices.length ? courseStartIndices[b + 1] : rawLines.length;
+      const blockLines = rawLines.slice(startIdx, endIdx);
+      const firstLine = blockLines[0];
 
-    // Approach 1: Check token sequence at end of line: [Title...] [Credit] [Grade] [GradePoint]
-    const tokens = afterCode.split(/\s+/).filter(Boolean);
-    let matchedBackwards = false;
+      const codeMatch = firstLine.match(COURSE_CODE_REGEX);
+      if (!codeMatch) continue;
 
-    if (tokens.length >= 3) {
-      const lastToken = tokens[tokens.length - 1];
-      const secondLastToken = tokens[tokens.length - 2]?.toUpperCase();
-      const thirdLastToken = tokens[tokens.length - 3];
+      const deptPrefix = codeMatch[1].toUpperCase();
+      const courseDigits = codeMatch[2];
+      let fullCode = `${deptPrefix} ${courseDigits}`;
+      const courseNum = parseInt(courseDigits, 10);
 
-      const parsedLastGp = parseFloat(lastToken);
-      const isValidGrade = secondLastToken && GRADE_POINT_MAP[secondLastToken] !== undefined;
-      const parsedThirdCredit = parseFloat(thirdLastToken);
+      const codePos = firstLine.indexOf(codeMatch[0]);
+      let titlePart = firstLine.substring(codePos + codeMatch[0].length).trim();
 
-      if (!isNaN(parsedLastGp) && isValidGrade && !isNaN(parsedThirdCredit)) {
-        gradePoint = snapGradePoint(parsedLastGp);
-        grade = secondLastToken;
-        credits = snapCredit(parsedThirdCredit);
-        title = tokens.slice(0, tokens.length - 3).join(' ').trim();
-        matchedBackwards = true;
-      }
-    }
+      // Look across all lines in this block for credits, grade, and grade point
+      const restLines = blockLines.slice(1);
+      const allTokens = restLines.flatMap((l) => l.split(/\s+/).filter(Boolean));
 
-    // Approach 2: Fallback search if table tokens are scattered or OCR noisy
-    if (!matchedBackwards) {
-      const gpMatches = [...afterCode.matchAll(/\b([0-4]\.\d{1,2})\b/g)];
-      if (gpMatches.length > 0) {
-        const lastGp = parseFloat(gpMatches[gpMatches.length - 1][1]);
-        gradePoint = snapGradePoint(lastGp);
-        grade = GP_TO_GRADE_MAP[gradePoint] || 'A+';
+      let credits: number | undefined = undefined;
+      let grade: string | undefined = undefined;
+      let gradePoint: number | undefined = undefined;
 
-        if (gpMatches.length >= 2) {
-          credits = snapCredit(parseFloat(gpMatches[gpMatches.length - 2][1]));
-          const crIdx = afterCode.indexOf(gpMatches[gpMatches.length - 2][1]);
-          if (crIdx > 0) title = afterCode.substring(0, crIdx).trim();
-        } else {
-          const crMatch = afterCode.match(/\b(0\.75|1\.50?|2\.00?|3\.00?|4\.00?|6\.00?)\b/);
-          if (crMatch) {
-            credits = snapCredit(parseFloat(crMatch[0]));
-            const crIdx = afterCode.indexOf(crMatch[0]);
-            if (crIdx > 0) title = afterCode.substring(0, crIdx).trim();
+      // 1. Scan subsequent tokens in multi-line paste
+      for (const tok of allTokens) {
+        // Standard BUET credit
+        if (/^(0\.75|1\.50?|2\.00?|3\.00?|4\.00?|6\.00?)$/.test(tok)) {
+          if (credits === undefined) {
+            credits = snapCredit(parseFloat(tok));
+            continue;
+          }
+        }
+        // BUET Letter Grade
+        if (/^(A\+|A-|A|B\+|B-|B|C\+|C|D|F|S|X)$/i.test(tok)) {
+          if (grade === undefined) {
+            grade = tok.toUpperCase();
+            continue;
+          }
+        }
+        // Grade Point decimal
+        if (/^[0-4]\.\d{1,2}$/.test(tok)) {
+          const val = parseFloat(tok);
+          if (gradePoint === undefined && (GRADE_POINT_MAP[GP_TO_GRADE_MAP[val]] !== undefined || val === 0)) {
+            gradePoint = snapGradePoint(val);
+          } else if (credits === undefined && (val === 0.75 || val === 1.5 || val === 2.0 || val === 3.0 || val === 4.0)) {
+            credits = snapCredit(val);
           }
         }
       }
 
-      const grMatch = afterCode.match(/(?:^|\s)(A\+|A-|A|B\+|B-|B|C\+|C|D|F|S|X)(?=\s|$)/);
-      if (grMatch) {
-        grade = grMatch[1];
-        gradePoint = GRADE_POINT_MAP[grade] ?? gradePoint;
+      // 2. Fallback to scanning the first line for single-line format
+      if (credits === undefined || grade === undefined || gradePoint === undefined) {
+        const lineTokens = titlePart.split(/\s+/).filter(Boolean);
+        if (lineTokens.length >= 3) {
+          const last = lineTokens[lineTokens.length - 1];
+          const secondLast = lineTokens[lineTokens.length - 2]?.toUpperCase();
+          const thirdLast = lineTokens[lineTokens.length - 3];
+
+          if (gradePoint === undefined && /^[0-4]\.\d{1,2}$/.test(last)) {
+            gradePoint = snapGradePoint(parseFloat(last));
+          }
+          if (grade === undefined && GRADE_POINT_MAP[secondLast] !== undefined) {
+            grade = secondLast;
+          }
+          if (credits === undefined && !isNaN(parseFloat(thirdLast))) {
+            credits = snapCredit(parseFloat(thirdLast));
+          }
+
+          if (gradePoint !== undefined && grade !== undefined && credits !== undefined) {
+            titlePart = lineTokens.slice(0, lineTokens.length - 3).join(' ');
+          }
+        }
       }
 
-      if (!title) {
-        title = afterCode
-          .replace(new RegExp(`\\b${credits.toFixed(2)}|${credits.toFixed(1)}|${credits}\\b`, 'g'), '')
-          .replace(new RegExp(`\\b${grade}\\b`, 'g'), '')
-          .replace(new RegExp(`\\b${gradePoint.toFixed(2)}|${gradePoint.toFixed(1)}\\b`, 'g'), '')
+      // Deduce missing grade or gradePoint
+      if (gradePoint !== undefined && grade === undefined) {
+        grade = GP_TO_GRADE_MAP[gradePoint] || 'A+';
+      }
+      if (grade !== undefined && gradePoint === undefined) {
+        gradePoint = GRADE_POINT_MAP[grade] ?? 4.00;
+      }
+
+      // Collect any title words from subsequent lines (excluding numbers/grades)
+      const nonNumericWords: string[] = [];
+      for (const rLine of restLines) {
+        const cleaned = rLine
+          .replace(/\b(0\.75|1\.50?|2\.00?|3\.00?|4\.00?|6\.00?)\b/g, '')
+          .replace(/\b(A\+|A-|A|B\+|B-|B|C\+|C|D|F|S|X)\b/gi, '')
+          .replace(/\b[0-4]\.\d{1,2}\b/g, '')
           .replace(/[\|\-\:\+\=\*\_\/\[\]]/g, ' ')
           .replace(/\s{2,}/g, ' ')
           .trim();
+        if (cleaned.length > 2 && !/^\d+$/.test(cleaned)) {
+          nonNumericWords.push(cleaned);
+        }
       }
+
+      let title = (titlePart + ' ' + nonNumericWords.join(' ')).trim();
+      title = title
+        .replace(/\b(0\.75|1\.50?|2\.00?|3\.00?|4\.00?|6\.00?)\b/g, '')
+        .replace(/\b(A\+|A-|A|B\+|B-|B|C\+|C|D|F|S|X)\b/gi, '')
+        .replace(/\b[0-4]\.\d{1,2}\b/g, '')
+        .replace(/[\|\:\+\=\*\_\/\[\]]/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+      const finalCredits = credits ?? (courseNum % 2 === 0 ? 1.5 : 3.0);
+      const finalGrade = grade ?? 'A+';
+      const finalGradePoint = gradePoint ?? (GRADE_POINT_MAP[finalGrade] ?? 4.00);
+
+      const catalogMatch = matchBuetCourse(fullCode, title);
+      const finalTitle = catalogMatch?.title || title || `Course ${fullCode}`;
+
+      const isSessional =
+        catalogMatch?.type === 'sessional' ||
+        finalCredits <= 1.5 ||
+        courseNum % 2 === 0 ||
+        /lab|sessional|drawing|shop|practice/i.test(finalTitle);
+
+      courses.push({
+        code: catalogMatch?.code || fullCode,
+        title: finalTitle,
+        credits: catalogMatch?.credits ?? finalCredits,
+        grade: finalGrade,
+        gradePoint: finalGradePoint,
+        type: isSessional ? 'sessional' : 'theory',
+      });
     }
+  } else {
+    // Fallback: Line-by-line fallback parser for non-standard formats
+    for (let i = 0; i < rawLines.length; i++) {
+      const line = rawLines[i];
+      const codeMatch = line.match(COURSE_CODE_REGEX);
+      if (!codeMatch) continue;
 
-    // Clean title string
-    title = title
-      .replace(/[\|\-\:\+\=\*\_\/\[\]]/g, ' ')
-      .replace(/\s{2,}/g, ' ')
-      .trim();
+      const fullCode = `${codeMatch[1].toUpperCase()} ${codeMatch[2]}`;
+      const courseNum = parseInt(codeMatch[2], 10);
+      const codeIndex = line.indexOf(codeMatch[0]);
+      const afterCode = line.substring(codeIndex + codeMatch[0].length).trim();
 
-    // Check BUET Catalog Fuzzy Matcher
-    const catalogMatch = matchBuetCourse(fullCode, title);
-    if (catalogMatch) {
-      fullCode = catalogMatch.code;
-      title = catalogMatch.title;
-      credits = catalogMatch.credits;
-    } else if (!title || title.length < 2) {
-      title = `Course ${fullCode}`;
+      let credits = courseNum % 2 === 0 ? 1.5 : 3.0;
+      let grade = 'A+';
+      let gradePoint = 4.00;
+      let title = afterCode;
+
+      const crMatch = afterCode.match(/\b(0\.75|1\.50?|2\.00?|3\.00?|4\.00?|6\.00?)\b/);
+      if (crMatch) credits = snapCredit(parseFloat(crMatch[0]));
+
+      const grMatch = afterCode.match(/\b(A\+|A-|A|B\+|B-|B|C\+|C|D|F|S|X)\b/i);
+      if (grMatch) grade = grMatch[1].toUpperCase();
+
+      const gpMatch = afterCode.match(/\b([0-4]\.\d{1,2})\b/);
+      if (gpMatch) gradePoint = snapGradePoint(parseFloat(gpMatch[0]));
+      else if (GRADE_POINT_MAP[grade] !== undefined) gradePoint = GRADE_POINT_MAP[grade];
+
+      title = title
+        .replace(/\b(0\.75|1\.50?|2\.00?|3\.00?|4\.00?|6\.00?)\b/g, '')
+        .replace(/\b(A\+|A-|A|B\+|B-|B|C\+|C|D|F|S|X)\b/gi, '')
+        .replace(/\b[0-4]\.\d{1,2}\b/g, '')
+        .replace(/[\|\-\:\+\=\*\_\/\[\]]/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+      const catalogMatch = matchBuetCourse(fullCode, title);
+      courses.push({
+        code: catalogMatch?.code || fullCode,
+        title: catalogMatch?.title || title || `Course ${fullCode}`,
+        credits: catalogMatch?.credits ?? credits,
+        grade,
+        gradePoint,
+        type: courseNum % 2 === 0 || /lab|sessional|drawing|shop|practice/i.test(title) ? 'sessional' : 'theory',
+      });
     }
-
-    // Strict BUET Ordinance pairing: Grade Point dictates Grade
-    if (GP_TO_GRADE_MAP[gradePoint]) {
-      grade = GP_TO_GRADE_MAP[gradePoint];
-    }
-
-    const isSessional =
-      catalogMatch?.type === 'sessional' ||
-      credits <= 1.5 ||
-      courseNum % 2 === 0 ||
-      /lab|sessional|drawing|shop|practice/i.test(title);
-    const type: CourseType = isSessional ? 'sessional' : 'theory';
-
-    courses.push({
-      code: fullCode,
-      title,
-      credits,
-      grade,
-      gradePoint,
-      type,
-    });
   }
 
   let totalPoints = 0;

@@ -52,7 +52,7 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
   onDeleteCourse,
   onBulkAddCourses,
 }) => {
-  const [activeTab, setActiveTab] = useState<'manual' | 'biis'>('manual');
+  const [activeTab, setActiveTab] = useState<'manual' | 'paste' | 'scan'>('manual');
 
   // Manual Form State
   const [newCode, setNewCode] = useState('');
@@ -86,9 +86,28 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
   const semesterGpa = calculateGPA(
     semesterCourses.map((c) => ({
       credits: c.credits,
-      gradePoint: c.isOngoing ? c.projectedGradePoint ?? 4.0 : (c.gradePoint ?? 4.0),
+      gradePoint: c.isOngoing ? (c.gradePoint ?? c.projectedGradePoint ?? 4.0) : (c.gradePoint ?? 4.0),
     }))
   );
+
+  const gradedCourses = courses.filter((c) => c.gradePoint !== undefined && c.gradePoint > 0);
+  const cumulativeCgpa = calculateGPA(
+    gradedCourses.map((c) => ({
+      credits: c.credits,
+      gradePoint: c.gradePoint ?? 4.0,
+    }))
+  );
+
+  const handleSetAllSemesterGrades = (grade: string, gradePoint: number) => {
+    semesterCourses.forEach((c) => {
+      onUpdateCourse({
+        ...c,
+        grade,
+        gradePoint,
+        projectedGradePoint: gradePoint,
+      });
+    });
+  };
 
   const handleCreateCourse = (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,9 +125,9 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
       room: newRoom.trim() || undefined,
       color: newColor,
       isOngoing: isOngoingSemester,
-      grade: isOngoingSemester ? undefined : newGrade,
-      gradePoint: isOngoingSemester ? undefined : newGradePoint,
-      projectedGradePoint: isOngoingSemester && newType === 'sessional' ? 4.0 : undefined,
+      grade: newGrade,
+      gradePoint: newGradePoint,
+      projectedGradePoint: newGradePoint,
       attendance: isOngoingSemester && newType === 'theory' ? { totalConducted: 0, attended: 0 } : undefined,
       classTests: isOngoingSemester && newType === 'theory' ? [] : undefined,
     };
@@ -130,12 +149,51 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
     setParseResult(result);
   };
 
-  const handleImportScannedCourses = (scannedCourses: ParsedBIISCourse[]) => {
-    const appCourses = scannedCourses.map((parsed) =>
-      convertParsedCourseToAppCourse(parsed, viewedSemesterId, isOngoingSemester)
-    );
-    onBulkAddCourses(appCourses);
+  const handleImportParsedCourses = (parsedList: ParsedBIISCourse[]) => {
+    const norm = (str: string) => str.replace(/\s+/g, '').toUpperCase();
+    const existingMap = new Map(semesterCourses.map((c) => [norm(c.code), c]));
+    const toAdd: Course[] = [];
+
+    parsedList.forEach((parsed) => {
+      const codeKey = norm(parsed.code);
+      const existing = existingMap.get(codeKey);
+
+      if (existing) {
+        onUpdateCourse({
+          ...existing,
+          title: parsed.title,
+          credits: parsed.credits,
+          grade: parsed.grade,
+          gradePoint: parsed.gradePoint,
+          projectedGradePoint: parsed.gradePoint,
+        });
+      } else {
+        toAdd.push({
+          id: `course_${viewedSemesterId}_${parsed.code.replace(/[^a-zA-Z0-9]/g, '_')}`,
+          code: parsed.code,
+          title: parsed.title,
+          nickname: parsed.title,
+          credits: parsed.credits,
+          type: parsed.type,
+          semesterId: viewedSemesterId,
+          color: '#3b82f6',
+          isOngoing: isOngoingSemester,
+          grade: parsed.grade,
+          gradePoint: parsed.gradePoint,
+          projectedGradePoint: parsed.gradePoint,
+        });
+      }
+    });
+
+    if (toAdd.length > 0) {
+      onBulkAddCourses(toAdd);
+    }
+
     setActiveTab('manual');
+  };
+
+  const handleImportScannedCourses = (scannedCourses: ParsedBIISCourse[]) => {
+    handleImportParsedCourses(scannedCourses);
   };
 
   const handlePopulateCurriculum = () => {
@@ -148,19 +206,50 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
   };
 
   const handleLoadSampleBIIS = () => {
-    const sample = `Bangladesh University of Engineering and Technology
-Result Sheet - Term Examination
-Student ID: 2308001   Name: Ashfaque Amin Eshan
-Course No    Course Title                                      Credit    Grade    Grade Point
-ME 243       Mechanics of Solids                               3.00      A+       4.00
-ME 265       Thermal Engineering and Heat Transfer             3.00      A        3.75
-IPE 205      Manufacturing Processes I                         3.00      A+       4.00
-IPE 207      Engineering Metallurgy                            3.00      A-       3.50
-IPE 209      Engineering Economy                               2.00      A+       4.00
-ME 244       Mechanics of Solids Sessional                     0.75      A+       4.00
-ME 266       Thermal Engineering Sessional                     0.75      A        3.75
-IPE 206      Manufacturing Processes I Sessional               0.75      A+       4.00
-IPE 208      Engineering Metallurgy Sessional                  0.75      A+       4.00`;
+    const sample = ` CHEM 114\t Inorganic Quantitative Analysis Sessional\t
+1.50
+    A\t
+  3.75
+
+ CHEM 119\t Chemistry - I\t
+3.00
+    B+\t
+  3.25
+
+ HUM 102\t English Language Practice\t
+1.50
+    A-\t
+  3.50
+
+ HUM 211\t Sociology\t
+2.00
+    A+\t
+  4.00
+
+ IPE 105\t Principles of Cost and Management Accounting\t
+3.00
+    A\t
+  3.75
+
+ MATH 191\t Differential and Integral Calculus\t
+4.00
+    A+\t
+  4.00
+
+ ME 160\t Mechanical Engineering Drawing - I\t
+1.50
+    A\t
+  3.75
+
+ PHY 117\t Structure of Matter, Electricity, Magnetism and Modern Physics\t
+3.00
+    B-\t
+  2.75
+
+ SHOP 170\t Machine Shop\t
+0.75
+    A+\t
+  4.00`;
 
     setBiisRawText(sample);
     handleParseBIIS(sample);
@@ -209,8 +298,8 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
           })}
         </div>
 
-        {/* Term Metrics Capsule & Set Active Routine Button */}
-        <div className="flex items-center gap-2.5">
+        {/* Term Metrics Capsule & Quick Grade Setter */}
+        <div className="flex items-center gap-2.5 flex-wrap">
           {viewedSemesterId !== activeSemesterId && (
             <button
               onClick={() => onSelectSemester(viewedSemesterId)}
@@ -222,22 +311,58 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
             </button>
           )}
 
-          <div className="hidden sm:flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-zinc-900 border border-white/[0.08] text-xs tabular-nums">
-            <span className="text-zinc-200 font-semibold font-sans">{activeSemester.label}</span>
+          {/* Quick CGPA / Grade setter dropdown */}
+          {semesterCourses.length > 0 && (
+            <div className="flex items-center gap-1.5 bg-[#18191e] border border-white/[0.08] rounded-xl px-2.5 py-1 text-xs">
+              <span className="text-zinc-400">Set All:</span>
+              <select
+                onChange={(e) => {
+                  const match = BUET_GRADE_SCALE.find((g) => g.grade === e.target.value);
+                  if (match) {
+                    handleSetAllSemesterGrades(match.grade, match.gradePoint);
+                  }
+                  e.target.value = '';
+                }}
+                defaultValue=""
+                className="bg-transparent text-emerald-400 font-semibold cursor-pointer focus:outline-none"
+                title="Batch set all courses in this term to a specific grade"
+              >
+                <option value="" disabled className="bg-[#14151a] text-zinc-400">
+                  Grade Dropdown ▾
+                </option>
+                {BUET_GRADE_SCALE.map((g) => (
+                  <option key={g.grade} value={g.grade} className="bg-[#14151a] text-zinc-200">
+                    All {g.grade} ({g.gradePoint.toFixed(2)})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-zinc-900 border border-white/[0.08] text-xs tabular-nums">
+            <span className="text-zinc-200 font-semibold font-sans">{activeSemester.shortLabel}</span>
             <span className="text-zinc-600">•</span>
-            <span className="text-zinc-400">{semesterGpa.totalCredits} Credits</span>
+            <span className="text-zinc-400">{semesterGpa.totalCredits} Cr</span>
             <span className="text-zinc-600">•</span>
             <span className="text-emerald-400 font-bold">{semesterGpa.gpa.toFixed(2)} GPA</span>
+            {cumulativeCgpa.totalCredits > 0 && (
+              <>
+                <span className="text-zinc-600">•</span>
+                <span className="text-white font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20" title="Overall Cumulative CGPA">
+                  {cumulativeCgpa.gpa.toFixed(2)} CGPA
+                </span>
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Segmented Control: Registry vs BIIS Parser */}
-      <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+      {/* Segmented Control: Registry vs Paste BIIS vs Screenshot Scanner */}
+      <div className="flex items-center justify-between border-b border-white/[0.08] pb-3 flex-wrap gap-2">
         <div className="flex gap-2">
           <button
             onClick={() => setActiveTab('manual')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition btn-tactile ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition btn-tactile cursor-pointer ${
               activeTab === 'manual'
                 ? 'bg-zinc-800 text-zinc-100 shadow-xs border border-white/10'
                 : 'text-zinc-400 hover:text-zinc-200'
@@ -246,15 +371,26 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
             Course Registry ({semesterCourses.length})
           </button>
           <button
-            onClick={() => setActiveTab('biis')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition btn-tactile ${
-              activeTab === 'biis'
+            onClick={() => setActiveTab('paste')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition btn-tactile cursor-pointer ${
+              activeTab === 'paste'
+                ? 'bg-zinc-800 text-zinc-100 shadow-xs border border-white/10'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Clipboard className="w-3.5 h-3.5 text-blue-400" />
+            <span>Paste BIIS Text</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('scan')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition btn-tactile cursor-pointer ${
+              activeTab === 'scan'
                 ? 'bg-zinc-800 text-zinc-100 shadow-xs border border-white/10'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
             <Camera className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Scan Result Screenshot</span>
+            <span>Scan Screenshot</span>
           </button>
         </div>
 
@@ -439,7 +575,7 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
                     <th className="p-3.5">Type</th>
                     <th className="p-3.5 text-center">Credits</th>
                     <th className="p-3.5">Instructor & Room</th>
-                    <th className="p-3.5 text-center">Grade / Status</th>
+                    <th className="p-3.5 text-center">Grade (CGPA Dropdown)</th>
                     <th className="p-3.5 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -489,21 +625,22 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
                       </td>
 
                       <td className="p-3.5 text-center">
-                        {c.isOngoing ? (
-                          <span className="px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-400 border border-emerald-800/60 font-semibold text-[10px]">
-                            Ongoing Term
-                          </span>
-                        ) : (
+                        <div className="inline-flex items-center justify-center gap-1.5">
                           <select
-                            value={c.grade || 'A+'}
+                            value={c.grade || (c.projectedGradePoint ? BUET_GRADE_SCALE.find((g) => g.gradePoint === c.projectedGradePoint)?.grade : 'A+') || 'A+'}
                             onChange={(e) => {
                               const match = BUET_GRADE_SCALE.find((g) => g.grade === e.target.value);
                               if (match) {
-                                onUpdateCourse({ ...c, grade: match.grade, gradePoint: match.gradePoint });
+                                onUpdateCourse({
+                                  ...c,
+                                  grade: match.grade,
+                                  gradePoint: match.gradePoint,
+                                  projectedGradePoint: match.gradePoint,
+                                });
                               }
                             }}
-                            className="bg-[#1b1d24] border border-white/[0.12] rounded-lg px-2 py-1 text-xs font-semibold text-zinc-100 cursor-pointer tabular-nums"
-                            title="Click to adjust completed grade"
+                            className="bg-[#1b1d24] border border-white/[0.12] rounded-lg px-2.5 py-1 text-xs font-semibold text-zinc-100 cursor-pointer tabular-nums hover:border-emerald-500/60 focus:outline-none focus:border-emerald-500 transition-colors"
+                            title="Click to select course grade and update CGPA live"
                           >
                             {BUET_GRADE_SCALE.map((g) => (
                               <option key={g.grade} value={g.grade} className="bg-[#14151a]">
@@ -511,13 +648,18 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
                               </option>
                             ))}
                           </select>
-                        )}
+                          {c.isOngoing && (
+                            <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/40" title="Active term course">
+                              Active
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       <td className="p-3.5 text-right">
                         <button
                           onClick={() => onDeleteCourse(c.id)}
-                          className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-950/30 transition btn-tactile"
+                          className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-950/30 transition btn-tactile cursor-pointer"
                           title="Delete Course"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -532,8 +674,106 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
         </div>
       )}
 
-      {/* TAB 2: BIIS Grade Sheet Screenshot Scanner */}
-      {activeTab === 'biis' && (
+      {/* TAB 2: Paste BIIS Text */}
+      {activeTab === 'paste' && (
+        <div className="surface-card p-6 space-y-5 animate-fade-in text-xs">
+          <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+            <div>
+              <h3 className="font-semibold tracking-tight text-zinc-100 text-sm flex items-center gap-2">
+                <Clipboard className="w-4 h-4 text-blue-400" />
+                <span>Paste BIIS Result Sheet Text ({activeSemester.label})</span>
+              </h3>
+              <p className="text-zinc-400 text-xs mt-0.5">
+                Paste raw table text copied directly from your BIIS portal (handles multi-line credits, grades, and grade points accurately).
+              </p>
+            </div>
+            <button
+              onClick={handleLoadSampleBIIS}
+              className="text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 transition cursor-pointer"
+            >
+              Load Sample BIIS Result
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            <textarea
+              rows={8}
+              value={biisRawText}
+              onChange={(e) => {
+                setBiisRawText(e.target.value);
+                handleParseBIIS(e.target.value);
+              }}
+              placeholder={`Paste copied text from biis.buet.ac.bd:\n\nExample:\n CHEM 114\t Inorganic Quantitative Analysis Sessional\n1.50\n    A\n  3.75\n\n CHEM 119\t Chemistry - I\n3.00\n    B+\n  3.25\n...`}
+              className="w-full bg-[#18191e] border border-white/[0.08] rounded-xl p-3.5 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 font-sans leading-relaxed"
+            />
+
+            <div className="flex items-center justify-between gap-3">
+              <button
+                onClick={() => handleParseBIIS()}
+                className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-semibold border border-white/[0.08] transition cursor-pointer"
+              >
+                Re-Parse Text
+              </button>
+
+              {parseResult && parseResult.success && parseResult.courses.length > 0 && (
+                <button
+                  onClick={() => handleImportParsedCourses(parseResult.courses)}
+                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md transition cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>
+                    Ingest {parseResult.courses.length} Courses into {activeSemester.shortLabel} ({parseResult.termGpa?.toFixed(2)} GPA)
+                  </span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Live Parsed Preview Table */}
+          {parseResult && parseResult.success && parseResult.courses.length > 0 && (
+            <div className="border border-white/[0.08] rounded-2xl bg-zinc-900/60 p-4 space-y-3">
+              <div className="flex items-center justify-between text-xs pb-2 border-b border-white/[0.06] tabular-nums">
+                <span className="font-semibold text-white">
+                  Parsed Output: {parseResult.courses.length} Courses Found • {parseResult.totalCredits} Credits
+                </span>
+                <span className="font-bold text-emerald-400 text-sm">
+                  {parseResult.termGpa?.toFixed(2)} Term GPA
+                </span>
+              </div>
+
+              <div className="overflow-x-auto max-h-60">
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="text-zinc-500 font-medium border-b border-white/[0.04]">
+                      <th className="pb-2">Code</th>
+                      <th className="pb-2">Title</th>
+                      <th className="pb-2 text-center">Credit</th>
+                      <th className="pb-2 text-center">Grade</th>
+                      <th className="pb-2 text-center">Point</th>
+                      <th className="pb-2 text-center">Type</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.04] text-zinc-300">
+                    {parseResult.courses.map((pc, idx) => (
+                      <tr key={idx} className="hover:bg-white/[0.02]">
+                        <td className="py-2 font-bold text-white">{pc.code}</td>
+                        <td className="py-2">{pc.title}</td>
+                        <td className="py-2 text-center tabular-nums">{pc.credits.toFixed(2)}</td>
+                        <td className="py-2 text-center font-bold text-emerald-400">{pc.grade}</td>
+                        <td className="py-2 text-center tabular-nums">{pc.gradePoint.toFixed(2)}</td>
+                        <td className="py-2 text-center uppercase text-[10px] text-zinc-400">{pc.type}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: BIIS Grade Sheet Screenshot Scanner */}
+      {activeTab === 'scan' && (
         <div className="surface-card p-6 space-y-4 animate-fade-in text-xs">
           <div>
             <h3 className="font-semibold tracking-tight text-zinc-100 text-sm flex items-center gap-2">
@@ -542,7 +782,7 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
             </h3>
             <p className="text-zinc-400 text-xs mt-0.5 leading-relaxed">
               No need to copy-paste boring text. Just take a screenshot of your result on{' '}
-              <span className="text-emerald-400 ">biis.buet.ac.bd</span> (
+              <span className="text-emerald-400">biis.buet.ac.bd</span> (
               <kbd className="px-1 py-0.5 rounded bg-zinc-800 text-[10px] text-zinc-300">
                 Win + Shift + S
               </kbd>

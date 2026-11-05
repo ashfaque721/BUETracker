@@ -5,7 +5,7 @@ import {
   RoutineMetadata,
   UserSettings,
 } from '../types';
-import { convertParsedCourseToAppCourse, ParsedBIISCourse } from '../utils/biisParser';
+import { convertParsedCourseToAppCourse, parseBIISText, ParsedBIISCourse } from '../utils/biisParser';
 import { BIISScreenshotScanner } from './BIISScreenshotScanner';
 import { SEED_COURSES, SEED_ROUTINE } from '../db';
 import {
@@ -148,21 +148,38 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
         // If the student pasted BIIS text for this specific semester, apply those grades!
         const pastedText = pastedBiisPerTerm[pSem.id];
         if (pastedText && pastedText.trim()) {
-          const lines = pastedText.split(/\r?\n/);
-          pCourses = pCourses.map((c) => {
-            for (const line of lines) {
-              const codeRegex = new RegExp(`\\b${c.code.replace(/\\s+/g, '\\s*')}\\b`, 'i');
-              if (codeRegex.test(line)) {
-                const gradeMatch = line.match(/\b(A\+|A-|A|B\+|B-|B|C\+|C|D|F)\b/i);
-                if (gradeMatch) {
-                  const gr = gradeMatch[1].toUpperCase();
-                  const gp = gr === 'A+' ? 4.0 : gr === 'A' ? 3.75 : gr === 'A-' ? 3.5 : gr === 'B+' ? 3.25 : gr === 'B' ? 3.0 : gr === 'B-' ? 2.75 : gr === 'C+' ? 2.5 : gr === 'C' ? 2.25 : gr === 'D' ? 2.0 : 0.0;
-                  return { ...c, grade: gr, gradePoint: gp };
-                }
+          const parsed = parseBIISText(pastedText);
+          if (parsed.success && parsed.courses.length > 0) {
+            const parsedMap = new Map(parsed.courses.map((pc) => [pc.code.replace(/\s+/g, '').toUpperCase(), pc]));
+            pCourses = pCourses.map((c) => {
+              const pc = parsedMap.get(c.code.replace(/\s+/g, '').toUpperCase());
+              if (pc) {
+                return { ...c, grade: pc.grade, gradePoint: pc.gradePoint, credits: pc.credits };
               }
-            }
-            return c;
-          });
+              return c;
+            });
+            // Also append any parsed courses that weren't in the default curriculum list
+            const existingCodes = new Set(pCourses.map((c) => c.code.replace(/\s+/g, '').toUpperCase()));
+            parsed.courses.forEach((pc) => {
+              const normCode = pc.code.replace(/\s+/g, '').toUpperCase();
+              if (!existingCodes.has(normCode)) {
+                pCourses.push({
+                  id: `course_${pSem.id}_${pc.code.replace(/[^a-zA-Z0-9]/g, '_')}`,
+                  code: pc.code,
+                  title: pc.title,
+                  nickname: pc.title,
+                  credits: pc.credits,
+                  type: pc.type,
+                  semesterId: pSem.id,
+                  color: '#3b82f6',
+                  isOngoing: false,
+                  grade: pc.grade,
+                  gradePoint: pc.gradePoint,
+                });
+                existingCodes.add(normCode);
+              }
+            });
+          }
         }
 
         prevCourses.push(...pCourses);

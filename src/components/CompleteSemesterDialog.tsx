@@ -6,6 +6,7 @@ import {
   BUET_GRADE_POINTS,
   getNextTermId,
 } from '../types/semester';
+import { parseBIISText } from '../utils/biisParser';
 import {
   CheckCircle2,
   X,
@@ -181,31 +182,19 @@ export const CompleteSemesterDialog: React.FC<CompleteSemesterDialogProps> = ({
       return;
     }
 
+    const parseResult = parseBIISText(biisRawText);
     const updated = { ...grades };
     let matchedCount = 0;
 
-    // Pattern matches: [Dept Code e.g. ME, IPE, MATH] [Num e.g. 243] ... [Grade e.g. A+, A, A-]
-    const lines = biisRawText.split(/\r?\n/);
-
-    for (const line of lines) {
-      if (!line.trim()) continue;
-
-      // Check against current semester course codes
-      for (const course of currentCourses) {
-        const escapedCode = course.code.replace(/\s+/g, '\\s*');
-        const codeRegex = new RegExp(`\\b${escapedCode}\\b`, 'i');
-
-        if (codeRegex.test(line)) {
-          // Look for BUET letter grades in the line
-          const gradeMatch = line.match(/\b(A\+|A-|A|B\+|B-|B|C\+|C|D|F)\b/i);
-          if (gradeMatch) {
-            const letterGrade = gradeMatch[1].toUpperCase();
-            const pt = BUET_GRADE_POINTS[letterGrade] ?? 4.0;
-            updated[course.code] = { finalGrade: letterGrade, gradePoint: pt };
-            matchedCount++;
-          }
+    if (parseResult.success && parseResult.courses.length > 0) {
+      parseResult.courses.forEach((pc) => {
+        const normParsedCode = pc.code.replace(/\s+/g, '').toUpperCase();
+        const match = currentCourses.find((c) => c.code.replace(/\s+/g, '').toUpperCase() === normParsedCode);
+        if (match) {
+          updated[match.code] = { finalGrade: pc.grade, gradePoint: pc.gradePoint };
+          matchedCount++;
         }
-      }
+      });
     }
 
     setGrades(updated);
