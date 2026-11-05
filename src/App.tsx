@@ -43,7 +43,8 @@ import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
 import { useSemesterStore } from './hooks/useSemesterStore';
 import { CompleteSemesterDialog } from './components/CompleteSemesterDialog';
-import { CompleteSemesterResult, TermId } from './types/semester';
+import { CompleteSemesterResult, TermId, Course as StoreCourse } from './types/semester';
+import { INITIAL_BUET_COURSES } from './data/initialSemesterData';
 import {
   storeCourseToAppCourse,
   appCourseToStoreCourse,
@@ -209,6 +210,32 @@ export function App() {
           const ipeCourses = getIpeCoursesForSemester(currentSemId, true);
           loadedCourses = [...loadedCourses, ...ipeCourses];
           await db.courses.bulkPut(ipeCourses);
+        }
+
+        // Ensure all prior completed semesters exist with authentic curriculum data
+        const existingSemIds = new Set(loadedCourses.map((c) => c.semesterId));
+        const missingPriorCourses: Course[] = [];
+
+        BUET_SEMESTERS.forEach((sem) => {
+          if (!existingSemIds.has(sem.id)) {
+            const initialSemCourses = INITIAL_BUET_COURSES.filter(
+              (c: StoreCourse) => semIdToTermId(c.termId) === semIdToTermId(sem.id)
+            );
+            if (initialSemCourses.length > 0) {
+              const appList = initialSemCourses.map((sc: StoreCourse) =>
+                storeCourseToAppCourse(sc, currentTerm)
+              );
+              missingPriorCourses.push(...appList);
+            } else {
+              const ipeCourses = getIpeCoursesForSemester(sem.id, sem.id === currentSemId);
+              missingPriorCourses.push(...ipeCourses);
+            }
+          }
+        });
+
+        if (missingPriorCourses.length > 0) {
+          loadedCourses = [...loadedCourses, ...missingPriorCourses];
+          await db.courses.bulkPut(missingPriorCourses);
         }
 
         // Ensure routine has slots; if not, automatically populate from IPE curriculum
@@ -835,7 +862,6 @@ export function App() {
               onSelectSemester={handleSwitchSemester}
               onAddCourse={handleAddCourse}
               onUpdateCourse={handleUpdateCourse}
-              onBulkUpdateCourses={handleBulkUpdateCourses}
               onDeleteCourse={handleDeleteCourse}
               onBulkAddCourses={handleBulkAddCourses}
             />

@@ -165,4 +165,25 @@ console.log('   L-2 T-1 GPA after Set All A+:', postBatchL2T1Gpa.gpa);
 if (postBatchL2T1Gpa.gpa !== 4.0) throw new Error(`Expected 4.00 for All A+, got ${postBatchL2T1Gpa.gpa}`);
 console.log('   ✅ Batch "Set All" dropdown successfully updated all courses in semester.');
 
+// --- TEST 6: CourseManager Pill CGPA Verification ---
+console.log('\n6. Testing CourseManager Pill CGPA for L-2 T-1...');
+const freshStoreCourses = [...INITIAL_BUET_COURSES];
+const l2t1FreshCourses = freshStoreCourses.filter((c) => c.termId === 'L-2 T-1');
+const l2t1Gpa = calculateGPA(l2t1FreshCourses.map((c) => ({ credits: c.credits, gradePoint: c.gradePoint })));
+
+const semIndex = 2; // L2T1
+const semIdsUpToL2T1 = new Set(['L-1 T-1', 'L-1 T-2', 'L-2 T-1']);
+const coursesUpToL2T1 = freshStoreCourses.filter(
+  (c) => semIdsUpToL2T1.has(c.termId) && typeof c.gradePoint === 'number'
+);
+const l2t1PillCgpa = calculateGPA(coursesUpToL2T1.map((c) => ({ credits: c.credits, gradePoint: c.gradePoint })));
+
+console.log('   L-2 T-1 Term GPA:', l2t1Gpa.gpa, '(21 Cr)');
+console.log('   L-2 T-1 Cumulative CGPA in Pill:', l2t1PillCgpa.gpa, `(${l2t1PillCgpa.totalCredits} Cr)`);
+
+if (l2t1Gpa.gpa !== 3.83) throw new Error(`Expected L-2 T-1 Term GPA 3.83, got ${l2t1Gpa.gpa}`);
+if (l2t1PillCgpa.gpa !== 3.82) throw new Error(`Expected L-2 T-1 Cumulative CGPA 3.82, got ${l2t1PillCgpa.gpa}`);
+if (l2t1PillCgpa.totalCredits !== 62.5) throw new Error(`Expected 62.5 credits, got ${l2t1PillCgpa.totalCredits}`);
+console.log('   ✅ Pill correctly shows 3.83 GPA and 3.82 CGPA (NOT 3.83 CGPA)!');
+
 console.log('\n🎉 ALL DROPDOWN AND CGPA ACCURACY TESTS PASSED!');

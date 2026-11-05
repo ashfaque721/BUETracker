@@ -39,7 +39,6 @@ interface CourseManagerProps {
   onSelectSemester: (semesterId: string) => void;
   onAddCourse: (course: Course) => void;
   onUpdateCourse: (course: Course) => void;
-  onBulkUpdateCourses?: (courses: Course[]) => void;
   onDeleteCourse: (courseId: string) => void;
   onBulkAddCourses: (courses: Course[]) => void;
 }
@@ -50,7 +49,6 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
   onSelectSemester,
   onAddCourse,
   onUpdateCourse,
-  onBulkUpdateCourses,
   onDeleteCourse,
   onBulkAddCourses,
 }) => {
@@ -85,7 +83,7 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
   const semesterCourses = courses.filter((c) => c.semesterId === viewedSemesterId);
   const isOngoingSemester = viewedSemesterId === activeSemesterId;
 
-  // Exact BUET Term GPA: sum(credits * gradePoint) / sum(credits) for all graded courses in term
+  // Exact BUET Term GPA: sum(credits * gradePoint) / sum(credits) for all graded courses in viewed term
   const gradedSemesterCourses = semesterCourses.filter(
     (c) => typeof c.gradePoint === 'number' && !isNaN(c.gradePoint)
   );
@@ -96,32 +94,37 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
     }))
   );
 
-  // Exact Cumulative CGPA: sum(credits * gradePoint) / sum(credits) for all graded courses across degree
-  const gradedCourses = courses.filter(
+  // Chronological Cumulative CGPA up to the viewed semester (official BUET Academic Transcript format)
+  const semIndex = BUET_SEMESTERS.findIndex((s) => s.id === viewedSemesterId);
+  const semIdsUpToViewed = new Set(
+    (semIndex >= 0 ? BUET_SEMESTERS.slice(0, semIndex + 1) : BUET_SEMESTERS).map((s) => s.id)
+  );
+  const coursesUpToViewed = courses.filter(
+    (c) =>
+      semIdsUpToViewed.has(c.semesterId) &&
+      typeof c.gradePoint === 'number' &&
+      !isNaN(c.gradePoint)
+  );
+  const cumulativeUpToTermGpa = calculateGPA(
+    coursesUpToViewed.map((c) => ({
+      credits: c.credits,
+      gradePoint: c.gradePoint,
+    }))
+  );
+
+  // Exact Degree CGPA across all graded courses across all semesters
+  const allGradedCourses = courses.filter(
     (c) => typeof c.gradePoint === 'number' && !isNaN(c.gradePoint)
   );
-  const cumulativeCgpa = calculateGPA(
-    gradedCourses.map((c) => ({
+  const degreeCgpa = calculateGPA(
+    allGradedCourses.map((c) => ({
       credits: c.credits,
       gradePoint: c.gradePoint,
     }))
   );
 
   const termTotalCredits = semesterCourses.reduce((sum, c) => sum + c.credits, 0);
-
-  const handleSetAllSemesterGrades = (grade: string, gradePoint: number) => {
-    const updatedList = semesterCourses.map((c) => ({
-      ...c,
-      grade,
-      gradePoint,
-      projectedGradePoint: gradePoint,
-    }));
-    if (onBulkUpdateCourses) {
-      onBulkUpdateCourses(updatedList);
-    } else {
-      updatedList.forEach((c) => onUpdateCourse(c));
-    }
-  };
+  const targetPillCgpa = cumulativeUpToTermGpa.totalCredits > 0 ? cumulativeUpToTermGpa : degreeCgpa;
 
   const handleCreateCourse = (e: React.FormEvent) => {
     e.preventDefault();
@@ -312,7 +315,7 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
           })}
         </div>
 
-        {/* Term Metrics Capsule & Quick Grade Setter */}
+        {/* Term Metrics Capsule */}
         <div className="flex items-center gap-2.5 flex-wrap">
           {viewedSemesterId !== activeSemesterId && (
             <button
@@ -325,34 +328,6 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
             </button>
           )}
 
-          {/* Quick CGPA / Grade setter dropdown */}
-          {semesterCourses.length > 0 && (
-            <div className="flex items-center gap-1.5 bg-[#18191e] border border-white/[0.08] rounded-xl px-2.5 py-1 text-xs">
-              <span className="text-zinc-400">Set All:</span>
-              <select
-                onChange={(e) => {
-                  const match = BUET_GRADE_SCALE.find((g) => g.grade === e.target.value);
-                  if (match) {
-                    handleSetAllSemesterGrades(match.grade, match.gradePoint);
-                  }
-                  e.target.value = '';
-                }}
-                defaultValue=""
-                className="bg-transparent text-emerald-400 font-semibold cursor-pointer focus:outline-none"
-                title="Batch set all courses in this term to a specific grade"
-              >
-                <option value="" disabled className="bg-[#14151a] text-zinc-400">
-                  Grade Dropdown ▾
-                </option>
-                {BUET_GRADE_SCALE.map((g) => (
-                  <option key={g.grade} value={g.grade} className="bg-[#14151a] text-zinc-200">
-                    All {g.grade} ({g.gradePoint.toFixed(2)})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
           <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-zinc-900 border border-white/[0.08] text-xs tabular-nums">
             <span className="text-zinc-200 font-semibold font-sans">{activeSemester.shortLabel}</span>
             <span className="text-zinc-600">•</span>
@@ -361,11 +336,14 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
             <span className="text-emerald-400 font-bold">
               {gradedSemesterCourses.length > 0 ? `${semesterGpa.gpa.toFixed(2)} GPA` : '— GPA'}
             </span>
-            {cumulativeCgpa.totalCredits > 0 && (
+            {targetPillCgpa.totalCredits > 0 && (
               <>
                 <span className="text-zinc-600">•</span>
-                <span className="text-white font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20" title="Overall Cumulative CGPA">
-                  {cumulativeCgpa.gpa.toFixed(2)} CGPA
+                <span
+                  className="text-white font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20"
+                  title={`Cumulative CGPA up to ${activeSemester.shortLabel}: ${targetPillCgpa.gpa.toFixed(2)} (${targetPillCgpa.totalCredits} Cr)`}
+                >
+                  {targetPillCgpa.gpa.toFixed(2)} CGPA
                 </span>
               </>
             )}
