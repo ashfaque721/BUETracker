@@ -9,6 +9,11 @@ import { convertParsedCourseToAppCourse, ParsedBIISCourse } from '../utils/biisP
 import { BIISScreenshotScanner } from './BIISScreenshotScanner';
 import { SEED_COURSES, SEED_ROUTINE } from '../db';
 import {
+  getIpeCoursesForSemester,
+  getIpeRoutineForSemester,
+  IPE_CURRICULUM_DATA,
+} from '../utils/ipeCurriculum';
+import {
   GraduationCap,
   Calendar,
   BookOpen,
@@ -110,186 +115,49 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
 
     let initialCourses: Course[] = [];
 
-    if (isFreshmanL1T1) {
-      if (l1t1Template === 'standard') {
-        // Provide standard L1T1 course structure so freshman has clean courses to track
-        initialCourses = [
-          {
-            id: `c_l1t1_${Date.now()}_1`,
-            code: 'MATH 191',
-            title: 'Differential and Integral Calculus',
-            nickname: 'Calculus',
-            credits: 3.0,
-            type: 'theory',
-            semesterId: 'L1T1',
-            color: '#3b82f6',
-            isOngoing: true,
-            attendance: { totalConducted: 0, attended: 0 },
-            classTests: [],
-          },
-          {
-            id: `c_l1t1_${Date.now()}_2`,
-            code: 'PHY 109',
-            title: 'Physics I (Heat, Waves and Optics)',
-            nickname: 'Physics I',
-            credits: 3.0,
-            type: 'theory',
-            semesterId: 'L1T1',
-            color: '#8b5cf6',
-            isOngoing: true,
-            attendance: { totalConducted: 0, attended: 0 },
-            classTests: [],
-          },
-          {
-            id: `c_l1t1_${Date.now()}_3`,
-            code: 'CHEM 109',
-            title: 'Chemistry I',
-            nickname: 'Chemistry',
-            credits: 3.0,
-            type: 'theory',
-            semesterId: 'L1T1',
-            color: '#06b6d4',
-            isOngoing: true,
-            attendance: { totalConducted: 0, attended: 0 },
-            classTests: [],
-          },
-          {
-            id: `c_l1t1_${Date.now()}_4`,
-            code: 'HUM 101',
-            title: 'English and Economics',
-            nickname: 'English',
-            credits: 3.0,
-            type: 'theory',
-            semesterId: 'L1T1',
-            color: '#ec4899',
-            isOngoing: true,
-            attendance: { totalConducted: 0, attended: 0 },
-            classTests: [],
-          },
-          {
-            id: `c_l1t1_${Date.now()}_5`,
-            code: 'ME 160',
-            title: 'Mechanical Engineering Drawing-I',
-            nickname: 'Drawing Lab',
-            credits: 1.5,
-            type: 'sessional',
-            semesterId: 'L1T1',
-            color: '#f59e0b',
-            isOngoing: true,
-            projectedGradePoint: 4.0,
-          },
-        ];
-      }
-    } else {
-      // Non-freshman: Ingest courses detected from Screenshot OCR or Quick CGPA
-      let prevCourses: Course[] = [];
-      if (confirmedCourses.length > 0) {
-        const targetPrevSemId = previousSemesters[previousSemesters.length - 1]?.id || 'L1T1';
-        prevCourses = confirmedCourses.map((parsed) =>
-          convertParsedCourseToAppCourse(parsed, targetPrevSemId, false)
-        );
-      } else if (ingestMethod === 'quick_gpa') {
-        const targetPrevSemId = previousSemesters[previousSemesters.length - 1]?.id || 'L1T1';
-        const parsedGpa = parseFloat(quickCgpa) || 3.75;
-        const parsedCredits = parseFloat(quickCredits) || 38.0;
-        prevCourses = [
-          {
-            id: `course_prev_summary_${Date.now()}`,
-            code: 'PREV 001',
-            title: 'Previous Academic Completed Credits',
-            nickname: 'Prior Terms',
-            credits: parsedCredits,
-            type: 'theory',
-            semesterId: targetPrevSemId,
-            color: '#10b981',
-            isOngoing: false,
-            grade: 'A',
-            gradePoint: parsedGpa,
-          },
-        ];
-      }
+    // Auto-populate authentic ongoing IPE courses for the chosen semester
+    const currentOngoingCourses = getIpeCoursesForSemester(selectedSemesterId, true);
 
-      // Populate current ongoing semester courses so Routine Designer and Assessment Engine are immediately usable
-      let currentOngoingCourses: Course[] = [];
-      if (selectedSemesterId === 'L2T1') {
-        currentOngoingCourses = SEED_COURSES.filter((c) => c.semesterId === 'L2T1').map((c) => ({
-          ...c,
-          id: `c_curr_${c.code.replace(/\s+/g, '_')}_${Date.now()}`,
-          isOngoing: true,
-        }));
-      } else if (selectedSemesterId === 'L1T2') {
-        currentOngoingCourses = SEED_COURSES.filter((c) => c.semesterId === 'L1T2').map((c) => ({
-          ...c,
-          id: `c_curr_${c.code.replace(/\s+/g, '_')}_${Date.now()}`,
-          isOngoing: true,
-        }));
-      } else {
-        // Standard ongoing starter courses for other semesters
-        currentOngoingCourses = [
-          {
-            id: `c_${selectedSemesterId}_1_${Date.now()}`,
-            code: 'DEPT 201',
-            title: `${resolvedDept} Core Theory I`,
-            nickname: 'Core Theory I',
-            credits: 3.0,
-            type: 'theory',
-            semesterId: selectedSemesterId,
-            color: '#3b82f6',
-            isOngoing: true,
-            attendance: { totalConducted: 0, attended: 0 },
-            classTests: [],
-          },
-          {
-            id: `c_${selectedSemesterId}_2_${Date.now()}`,
-            code: 'DEPT 203',
-            title: `${resolvedDept} Core Theory II`,
-            nickname: 'Core Theory II',
-            credits: 3.0,
-            type: 'theory',
-            semesterId: selectedSemesterId,
-            color: '#8b5cf6',
-            isOngoing: true,
-            attendance: { totalConducted: 0, attended: 0 },
-            classTests: [],
-          },
-          {
-            id: `c_${selectedSemesterId}_3_${Date.now()}`,
-            code: 'DEPT 202',
-            title: `${resolvedDept} Sessional Lab`,
-            nickname: 'Core Lab',
-            credits: 1.5,
-            type: 'sessional',
-            semesterId: selectedSemesterId,
-            color: '#10b981',
-            isOngoing: true,
-            projectedGradePoint: 4.0,
-          },
-        ];
+    let prevCourses: Course[] = [];
+    if (confirmedCourses.length > 0) {
+      const targetPrevSemId = previousSemesters[previousSemesters.length - 1]?.id || 'L1T1';
+      prevCourses = confirmedCourses.map((parsed) =>
+        convertParsedCourseToAppCourse(parsed, targetPrevSemId, false)
+      );
+    } else if (ingestMethod === 'quick_gpa') {
+      const targetPrevSemId = previousSemesters[previousSemesters.length - 1]?.id || 'L1T1';
+      const parsedGpa = parseFloat(quickCgpa) || 3.75;
+      const parsedCredits = parseFloat(quickCredits) || 38.0;
+      prevCourses = [
+        {
+          id: `course_prev_summary_${Date.now()}`,
+          code: 'PREV 001',
+          title: 'Previous Academic Completed Credits',
+          nickname: 'Prior Terms',
+          credits: parsedCredits,
+          type: 'theory',
+          semesterId: targetPrevSemId,
+          color: '#10b981',
+          isOngoing: false,
+          grade: 'A',
+          gradePoint: parsedGpa,
+        },
+      ];
+    } else if (previousSemesters.length > 0) {
+      // Auto-fill previous IPE terms with completed curriculum courses
+      for (const pSem of previousSemesters) {
+        const pCourses = getIpeCoursesForSemester(pSem.id, false);
+        prevCourses.push(...pCourses);
       }
-
-      initialCourses = [...prevCourses, ...currentOngoingCourses];
     }
 
-    const defaultSlots =
-      selectedSemesterId === 'L2T1'
-        ? SEED_ROUTINE.slots
-        : isFreshmanL1T1 && l1t1Template === 'standard'
-        ? [
-            { id: 's1', day: 'Saturday' as const, periodId: 1, span: 1, courseId: initialCourses[0]?.id, customCode: 'MATH 191', customTeacher: 'SA Sir' },
-            { id: 's2', day: 'Saturday' as const, periodId: 2, span: 1, courseId: initialCourses[1]?.id, customCode: 'PHY 109', customTeacher: 'MA Sir' },
-            { id: 's3', day: 'Sunday' as const, periodId: 1, span: 1, courseId: initialCourses[2]?.id, customCode: 'CHEM 109', customTeacher: 'FK Sir' },
-            { id: 's4', day: 'Monday' as const, periodId: 1, span: 1, courseId: initialCourses[3]?.id, customCode: 'HUM 101', customTeacher: 'RH Sir' },
-            { id: 's5', day: 'Tuesday' as const, periodId: 7, span: 1, courseId: initialCourses[4]?.id, customCode: 'ME 160', customTeacher: 'Drawing Lab' },
-          ]
-        : [];
+    initialCourses = [...prevCourses, ...currentOngoingCourses];
 
-    const initialRoutine: RoutineMetadata = {
-      id: `routine_${Date.now()}`,
-      title: routineTitle.trim() || `Class Routine — ${selectedSemester.shortLabel}`,
-      subTitle: `${selectedSemester.label} | ${resolvedDept}`,
-      effectiveDate: 'November 2026',
-      slots: defaultSlots,
-    };
+    // Auto-populate authentic BUET IPE Routine for the chosen semester
+    const initialRoutine = getIpeRoutineForSemester(selectedSemesterId, routineSection);
+    if (routineTitle.trim()) {
+      initialRoutine.title = routineTitle.trim();
+    }
 
     try {
       confetti({

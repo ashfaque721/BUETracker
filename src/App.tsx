@@ -23,6 +23,11 @@ import { SettingsModal } from './components/SettingsModal';
 import { StudentSetupWizard } from './components/StudentSetupWizard';
 import { calculateGPA } from './utils/buetOrdinance';
 import {
+  getIpeCoursesForSemester,
+  getIpeRoutineForSemester,
+  IPE_CURRICULUM_DATA,
+} from './utils/ipeCurriculum';
+import {
   Calendar,
   Calculator,
   BookOpen,
@@ -156,25 +161,39 @@ export function App() {
       const allSettings = await db.settings.toArray();
 
       if (allSettings.length > 0 && allSettings[0].isOnboarded) {
-        setSettings(allSettings[0]);
-        if (allCourses.length > 0) {
-          setCourses(allCourses);
-        } else {
-          setCourses([]);
+        const userSet = allSettings[0];
+        const currentSemId = userSet.currentSemesterId || 'L2T1';
+        let loadedCourses = allCourses;
+        let loadedRoutine = allRoutines[0];
+
+        // Ensure courses for current semester exist; if not, automatically populate from IPE curriculum
+        const semCourses = loadedCourses.filter((c) => c.semesterId === currentSemId);
+        if (semCourses.length === 0) {
+          const ipeCourses = getIpeCoursesForSemester(currentSemId, true);
+          loadedCourses = [...loadedCourses, ...ipeCourses];
+          await db.courses.bulkPut(ipeCourses);
         }
-        if (allRoutines.length > 0 && allRoutines[0].slots && allRoutines[0].slots.length > 0) {
-          setRoutine(allRoutines[0]);
-        } else {
-          setRoutine(SEED_ROUTINE);
+
+        // Ensure routine has slots; if not, automatically populate from IPE curriculum
+        if (!loadedRoutine || !loadedRoutine.slots || loadedRoutine.slots.length === 0) {
+          loadedRoutine = getIpeRoutineForSemester(currentSemId);
+          await db.routines.put(loadedRoutine);
+        }
+
+        setSettings(userSet);
+        setCourses(loadedCourses);
+        setRoutine(loadedRoutine);
+        if (loadedRoutine.title) {
+          setTitleText(loadedRoutine.title);
         }
       } else {
-        // First run: Do NOT preload dummy data! Show onboarding wizard
+        // First run: Show onboarding wizard
         const initialSetupSettings: UserSettings = {
           studentName: '',
           studentId: '',
           department: 'Industrial & Production Engineering (IPE)',
           totalDegreeCredits: 160,
-          currentSemesterId: 'L1T1',
+          currentSemesterId: 'L2T1',
           theme: 'dark',
           isOnboarded: false,
         };
@@ -192,40 +211,60 @@ export function App() {
     loadData();
   }, []);
 
-  // Keyboard Shortcuts Listener (Ctrl+S, Ctrl+E, Ctrl+P)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-        e.preventDefault();
-        showToast('Database changes saved locally');
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') {
-        e.preventDefault();
-        setActiveTab('routine');
-        showToast('Switched to Routine Designer');
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
-        e.preventDefault();
-        window.print();
+  // Semester Switcher Handler: switches active semester, ensures authentic IPE courses & routine exist
+  const handleSwitchSemester = async (newSemId: string) => {
+    try {
+      const semCurriculum = IPE_CURRICULUM_DATA[newSemId] || IPE_CURRICULUM_DATA.L2T1;
+      const newRoutine = getIpeRoutineForSemester(newSemId);
+
+      const existingSemCourses = courses.filter((c) => c.semesterId === newSemId);
+      let updatedCourses = [...courses];
+
+      // Mark other semesters as not ongoing
+      updatedCourses = updatedCourses.map((c) => {
+        if (c.semesterId !== newSemId && c.isOngoing) {
+          return { ...c, isOngoing: false };
+        }
+        return c;
+      });
+
+      if (existingSemCourses.length === 0) {
+        // Automatically populate authentic IPE courses for this semester
+        const newSemCourses = getIpeCoursesForSemester(newSemId, true);
+        updatedCourses = [...updatedCourses, ...newSemCourses];
+        await db.courses.bulkPut(newSemCourses);
+      } else {
+        // Mark existing courses of chosen semester as isOngoing: true
+        updatedCourses = updatedCourses.map((c) => {
+          if (c.semesterId === newSemId) {
+            return { ...c, isOngoing: true };
+          }
+          return c;
+        });
+        await db.courses.bulkPut(updatedCourses.filter((c) => c.semesterId === newSemId));
       }
-    };
 
-    window.addEventListener('keydown', handleKeyDown);
+      const updatedSettings: UserSettings = {
+        ...settings,
+        currentSemesterId: newSemId,
+      };
 
-    if ((window as any).electronAPI) {
-      const api = (window as any).electronAPI;
-      api.onTriggerExportRoutine(() => {
-        setActiveTab('routine');
-        showToast('Switched to Routine Designer for export');
-      });
-      api.onTriggerPrintRoutine(() => window.print());
-      api.onTriggerSaveDb(() => showToast('Database saved locally'));
-      api.onTriggerBackupJson(handleExportBackup);
-      api.onTriggerRestoreJson(() => {
-        setShowSettingsModal(true);
-      });
+      await db.routines.put(newRoutine);
+      await db.settings.put({ id: 'primary_settings', ...updatedSettings });
+
+      setCourses(updatedCourses);
+      setRoutine(newRoutine);
+      setSettings(updatedSettings);
+      if (newRoutine.title) {
+        setTitleText(newRoutine.title);
+      }
+
+      showToast(`Switched to ${semCurriculum.label} (${semCurriculum.shortLabel}) with official IPE routine & courses`);
+    } catch (err) {
+      console.error('Error switching semester:', err);
+      showToast('Failed to switch semester');
     }
-
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [routine, courses]);
+  };
 
   // First-Run Wizard Completion Handler
   const handleCompleteSetup = async (
@@ -263,20 +302,24 @@ export function App() {
     }
   };
 
-  // Explicit demo sample load (only if user asks for it)
+  // Explicit demo sample load: loads authentic BUET IPE curriculum for the active semester
   const handleLoadSampleRoutine = async () => {
+    const targetSemId = settings.currentSemesterId || 'L2T1';
+    const semRoutine = getIpeRoutineForSemester(targetSemId);
+    const semCourses = getIpeCoursesForSemester(targetSemId, true);
+
     await db.transaction('rw', db.courses, db.routines, db.settings, async () => {
+      // Keep completed prior courses, replace current semester courses
+      const otherCourses = courses.filter((c) => c.semesterId !== targetSemId);
       await db.courses.clear();
-      await db.routines.clear();
-      await db.settings.clear();
-      await db.courses.bulkAdd(SEED_COURSES);
-      await db.routines.add(SEED_ROUTINE);
-      await db.settings.add({ id: 'primary_settings', ...SEED_SETTINGS });
+      await db.courses.bulkAdd([...otherCourses, ...semCourses]);
+      await db.routines.put(semRoutine);
     });
-    setCourses(SEED_COURSES);
-    setRoutine(SEED_ROUTINE);
-    setSettings(SEED_SETTINGS);
-    showToast('Loaded BUET Level-2 Term-1 Sample Routine & Courses');
+
+    setCourses((prev) => [...prev.filter((c) => c.semesterId !== targetSemId), ...semCourses]);
+    setRoutine(semRoutine);
+    if (semRoutine.title) setTitleText(semRoutine.title);
+    showToast(`Loaded authentic BUET IPE ${IPE_CURRICULUM_DATA[targetSemId]?.shortLabel || targetSemId} routine & courses`);
   };
 
   // CRUD Handlers for Courses
@@ -401,8 +444,27 @@ export function App() {
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
               BUETTracker
             </h1>
-            <p className="text-xs text-zinc-400 mt-1 tabular-nums">
-              {deptShort} • {termShort}
+            <div className="mt-2.5">
+              <label className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 block mb-1">
+                Active Term
+              </label>
+              <div className="relative">
+                <select
+                  value={settings.currentSemesterId}
+                  onChange={(e) => handleSwitchSemester(e.target.value)}
+                  className="w-full bg-[#18191e] border border-white/[0.1] rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 font-medium focus:outline-none focus:border-emerald-500/60 cursor-pointer appearance-none pr-6 transition-colors"
+                >
+                  {BUET_SEMESTERS.map((sem) => (
+                    <option key={sem.id} value={sem.id} className="bg-[#14151a] text-zinc-200">
+                      {sem.shortLabel} — {sem.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-zinc-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            </div>
+            <p className="text-[11px] text-zinc-400 mt-2 tabular-nums">
+              {deptShort} • {IPE_CURRICULUM_DATA[settings.currentSemesterId]?.totalCredits || 20} credits
             </p>
           </div>
 
@@ -477,8 +539,8 @@ export function App() {
             <div className="w-full max-w-[1380px] mx-auto flex flex-col justify-center space-y-3.5">
               {/* Routine Header (Directly above centered table) */}
               <div className="flex items-center justify-between gap-4 w-full">
-                {/* Left: Editable routine title */}
-                <div>
+                {/* Left: Editable routine title & active term badge */}
+                <div className="flex items-center gap-3">
                   {isEditingTitle ? (
                     <input
                       type="text"
@@ -503,6 +565,9 @@ export function App() {
                       </span>
                     </h2>
                   )}
+                  <span className="px-2 py-0.5 rounded-md bg-white/[0.06] border border-white/[0.08] text-[11px] font-medium text-emerald-400">
+                    {IPE_CURRICULUM_DATA[settings.currentSemesterId]?.shortLabel || termShort}
+                  </span>
                 </div>
 
                 {/* Right: Action Buttons with cursor-pointer */}
@@ -551,6 +616,7 @@ export function App() {
               <RoutineDesigner
                 routine={routine}
                 courses={courses}
+                currentSemesterId={settings.currentSemesterId}
                 onUpdateRoutine={handleUpdateRoutine}
               />
             </div>
@@ -574,7 +640,7 @@ export function App() {
             <CourseManager
               courses={courses}
               activeSemesterId={settings.currentSemesterId}
-              onSelectSemester={(semId) => setSettings({ ...settings, currentSemesterId: semId })}
+              onSelectSemester={handleSwitchSemester}
               onAddCourse={handleAddCourse}
               onUpdateCourse={handleUpdateCourse}
               onDeleteCourse={handleDeleteCourse}

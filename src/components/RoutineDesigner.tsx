@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   DayOfWeek,
   RoutineMetadata,
@@ -11,10 +11,12 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { IPE_CURRICULUM_DATA } from '../utils/ipeCurriculum';
 
 interface RoutineDesignerProps {
   routine: RoutineMetadata;
   courses: Course[];
+  currentSemesterId?: string;
   onUpdateRoutine: (updated: RoutineMetadata) => void;
   onLoadSampleRoutine?: () => void;
   onStartBlank?: () => void;
@@ -34,9 +36,67 @@ const PERIODS: { id: number; name: string; timeRange: string }[] = [
 export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
   routine,
   courses,
+  currentSemesterId,
   onUpdateRoutine,
 }) => {
   const timetableRef = useRef<HTMLDivElement>(null);
+
+  const activeCurriculum = currentSemesterId ? IPE_CURRICULUM_DATA[currentSemesterId] : null;
+
+  // Filter courses strictly for the active semester (combining official curriculum + user registered courses)
+  const semesterCourseOptions = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        id?: string;
+        code: string;
+        title: string;
+        nickname: string;
+        credits: number;
+        type: CourseType;
+        teacher?: string;
+        room?: string;
+      }
+    >();
+
+    // 1. Official BUET IPE curriculum courses for this semester
+    if (activeCurriculum) {
+      for (const c of activeCurriculum.courses) {
+        map.set(c.code, {
+          id: `c_${currentSemesterId}_${c.code.replace(/[^a-zA-Z0-9]/g, '_')}`,
+          code: c.code,
+          title: c.title,
+          nickname: c.nickname || c.title,
+          credits: c.credits,
+          type: c.type,
+          teacher: c.teacher,
+          room: c.room,
+        });
+      }
+    }
+
+    // 2. User's registered courses for this semester
+    const matchingCourses = courses.filter(
+      (c) => !currentSemesterId || c.semesterId === currentSemesterId
+    );
+    for (const c of matchingCourses) {
+      map.set(c.code, {
+        id: c.id,
+        code: c.code,
+        title: c.title,
+        nickname: c.nickname || c.title,
+        credits: c.credits,
+        type: c.type,
+        teacher: c.teacher,
+        room: c.room,
+      });
+    }
+
+    return Array.from(map.values());
+  }, [courses, currentSemesterId, activeCurriculum]);
+
+  const theoryCourses = semesterCourseOptions.filter((c) => c.type === 'theory');
+  const sessionalCourses = semesterCourseOptions.filter((c) => c.type === 'sessional');
 
   // Cell Edit Modal State
   const [editingCell, setEditingCell] = useState<{
@@ -63,8 +123,13 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
       setFormSpan(existing.span || 1);
       setFormCourseId(existing.courseId || '');
 
-      const matchedCourse = courses.find((c) => c.id === existing.courseId || c.code === existing.customCode);
-      setFormType(matchedCourse?.type || (periodId === 7 || (existing.span && existing.span > 1) ? 'sessional' : 'theory'));
+      const matchedCourse = semesterCourseOptions.find(
+        (c) => c.id === existing.courseId || c.code === existing.customCode
+      );
+      setFormType(
+        matchedCourse?.type ||
+          (periodId === 7 || (existing.span && existing.span > 1) ? 'sessional' : 'theory')
+      );
     } else {
       setFormCode('');
       setFormNickname('');
@@ -77,15 +142,25 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
     setEditingCell({ day, periodId, existingSlot: existing });
   };
 
-  const handleCourseSelect = (courseId: string) => {
-    setFormCourseId(courseId);
-    const selected = courses.find((c) => c.id === courseId);
+  const handleCourseSelect = (selectedCode: string) => {
+    if (!selectedCode) {
+      setFormCourseId('');
+      return;
+    }
+    const selected = semesterCourseOptions.find((c) => c.code === selectedCode);
     if (selected) {
       setFormCode(selected.code);
       setFormNickname(selected.nickname || selected.title);
       setFormType(selected.type);
+      setFormCourseId(selected.id || '');
       if (selected.teacher) setFormTeacher(selected.teacher);
       if (selected.room) setFormRoom(selected.room);
+
+      if (selected.type === 'sessional' && editingCell && editingCell.periodId <= 5) {
+        setFormSpan(3);
+      } else if (selected.type === 'theory') {
+        setFormSpan(1);
+      }
     }
   };
 
@@ -367,26 +442,40 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
             </div>
 
             <form onSubmit={handleSaveSlot} className="space-y-3.5 text-xs">
-              {/* Quick Select from existing courses if available */}
-              {courses.length > 0 && (
-                <div>
-                  <label className="block text-zinc-400 font-medium mb-1 text-[11px]">
-                    Select Registered Course (Optional)
-                  </label>
-                  <select
-                    value={formCourseId}
-                    onChange={(e) => handleCourseSelect(e.target.value)}
-                    className="w-full bg-[#1b1d24] border border-white/[0.08] rounded-lg px-2.5 py-1.5 text-zinc-200 focus:outline-none focus:border-white/20 transition-colors cursor-pointer"
-                  >
-                    <option value="">-- Custom or Select Course --</option>
-                    {courses.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.code} — {c.nickname || c.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              {/* Course Dropdown Filtered to Current Semester */}
+              <div>
+                <label className="block text-zinc-400 font-medium mb-1 text-[11px] flex items-center justify-between">
+                  <span>
+                    Course Dropdown ({activeCurriculum?.shortLabel || currentSemesterId || 'Curriculum'})
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-normal">Auto-fills slot</span>
+                </label>
+                <select
+                  value={formCode}
+                  onChange={(e) => handleCourseSelect(e.target.value)}
+                  className="w-full bg-[#1b1d24] border border-white/[0.08] rounded-lg px-2.5 py-1.5 text-zinc-200 focus:outline-none focus:border-white/20 transition-colors cursor-pointer text-xs"
+                >
+                  <option value="">-- Select {activeCurriculum?.shortLabel || ''} Course or Enter Below --</option>
+                  {theoryCourses.length > 0 && (
+                    <optgroup label="Theory Courses (Continuous Assessment)">
+                      {theoryCourses.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.code} — {c.nickname || c.title} ({c.credits.toFixed(1)} cr)
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {sessionalCourses.length > 0 && (
+                    <optgroup label="Sessional / Lab Courses">
+                      {sessionalCourses.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.code} — {c.nickname || c.title} ({c.credits.toFixed(2)} cr)
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
 
               {/* Course Code */}
               <div>

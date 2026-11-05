@@ -15,6 +15,10 @@ import {
 import { BIISScreenshotScanner } from './BIISScreenshotScanner';
 import { calculateGPA } from '../utils/buetOrdinance';
 import {
+  getIpeCoursesForSemester,
+  IPE_CURRICULUM_DATA,
+} from '../utils/ipeCurriculum';
+import {
   BookOpen,
   Plus,
   Trash2,
@@ -127,6 +131,15 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
     setActiveTab('manual');
   };
 
+  const handlePopulateCurriculum = () => {
+    const curriculumCourses = getIpeCoursesForSemester(activeSemesterId, isOngoingSemester);
+    const existingCodes = new Set(semesterCourses.map((c) => c.code));
+    const toAdd = curriculumCourses.filter((c) => !existingCodes.has(c.code));
+    if (toAdd.length > 0) {
+      onBulkAddCourses(toAdd);
+    }
+  };
+
   const handleLoadSampleBIIS = () => {
     const sample = `Bangladesh University of Engineering and Technology
 Result Sheet - Term Examination
@@ -225,13 +238,23 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
         </div>
 
         {activeTab === 'manual' && (
-          <button
-            onClick={() => setIsFormOpen(!isFormOpen)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-xs transition btn-tactile"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>{isFormOpen ? 'Close Drawer' : 'Add Course'}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePopulateCurriculum}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-medium transition cursor-pointer"
+              title="Load standard BUET IPE curriculum courses for this term"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Auto-Fill {activeSemester.shortLabel}</span>
+            </button>
+            <button
+              onClick={() => setIsFormOpen(!isFormOpen)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{isFormOpen ? 'Close Drawer' : 'Add Course'}</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -372,10 +395,19 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
             {semesterCourses.length === 0 ? (
               <div className="p-12 text-center text-zinc-400 space-y-3">
                 <BookOpen className="w-8 h-8 text-zinc-500 mx-auto" />
-                <h4 className="font-semibold text-zinc-200">No Courses Registered</h4>
+                <h4 className="font-semibold text-zinc-200">No Courses Registered for {activeSemester.label}</h4>
                 <p className="text-xs text-zinc-400 max-w-sm mx-auto leading-relaxed">
-                  Click 'Add Course' to enter courses manually or use the 'BIIS Result Sheet Ingestion' tab to import an entire semester at once.
+                  You can automatically populate the official 6th edition BUET IPE curriculum courses for this term with a single click.
                 </p>
+                <button
+                  onClick={handlePopulateCurriculum}
+                  className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md transition cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>
+                    Populate {activeSemester.shortLabel} Curriculum ({IPE_CURRICULUM_DATA[activeSemesterId]?.courses.length || 0} Courses)
+                  </span>
+                </button>
               </div>
             ) : (
               <table className="w-full text-xs text-left">
