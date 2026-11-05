@@ -57,6 +57,15 @@ export const BUET_COURSE_CATALOG: BuetCatalogCourse[] = [
     type: 'theory',
     keywords: ['materials', 'chem 141'],
   },
+  {
+    code: 'CHEM 143',
+    dept: 'CHEM',
+    courseNo: 143,
+    title: 'Chemistry of Materials',
+    credits: 2.0,
+    type: 'theory',
+    keywords: ['chemistry of materials', 'materials', 'chem 143'],
+  },
 
   // Humanities
   {
@@ -337,6 +346,15 @@ export const BUET_COURSE_CATALOG: BuetCatalogCourse[] = [
     type: 'theory',
     keywords: ['waves and oscillations', 'optics', 'thermal physics', 'phy 121'],
   },
+  {
+    code: 'PHY 163',
+    dept: 'PHY',
+    courseNo: 163,
+    title: 'Waves and Oscillations, Physical Optics and Wave Mechanics',
+    credits: 3.0,
+    type: 'theory',
+    keywords: ['waves and oscillations', 'physical optics', 'wave mechanics', 'phy 163'],
+  },
 
   // Workshops
   {
@@ -581,14 +599,9 @@ export function matchBuetCourse(rawCode: string, rawTitle: string): BuetCatalogC
   let bestScore = 0;
 
   for (const course of BUET_COURSE_CATALOG) {
-    // BUET Ordinance Rule: Odd course numbers are Theory, Even course numbers are Sessional!
-    // Disallow matching a theory course when detected is sessional (or vice versa), unless detectedNum is 0.
-    if (detectedNum > 0) {
-      const detectedIsEven = detectedNum % 2 === 0;
-      const courseIsEven = course.courseNo % 2 === 0;
-      if (detectedIsEven !== courseIsEven) {
-        continue;
-      }
+    // BUET Ordinance Rule: If course number was detected, it MUST match the exact course number!
+    if (detectedNum > 0 && course.courseNo !== detectedNum) {
+      continue;
     }
 
     let score = 0;

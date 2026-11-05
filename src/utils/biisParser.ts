@@ -280,7 +280,9 @@ export function parseBIISText(text: string): BIISParseResult {
       const finalGradePoint = gradePoint ?? (GRADE_POINT_MAP[finalGrade] ?? 4.00);
 
       const catalogMatch = matchBuetCourse(fullCode, title);
-      const finalTitle = catalogMatch?.title || title || `Course ${fullCode}`;
+      // Strictly preserve cleanly parsed course codes (e.g. CHEM 143) and titles from actual BIIS sheet
+      const finalCode = fullCode && COURSE_CODE_REGEX.test(fullCode) ? fullCode : catalogMatch?.code || fullCode;
+      const finalTitle = title && title.length >= 3 && !title.startsWith('Course ') ? title : catalogMatch?.title || `Course ${finalCode}`;
 
       const isSessional =
         catalogMatch?.type === 'sessional' ||
@@ -289,9 +291,9 @@ export function parseBIISText(text: string): BIISParseResult {
         /lab|sessional|drawing|shop|practice/i.test(finalTitle);
 
       courses.push({
-        code: catalogMatch?.code || fullCode,
+        code: finalCode,
         title: finalTitle,
-        credits: catalogMatch?.credits ?? finalCredits,
+        credits: finalCredits,
         grade: finalGrade,
         gradePoint: finalGradePoint,
         type: isSessional ? 'sessional' : 'theory',
