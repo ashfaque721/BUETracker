@@ -15,7 +15,7 @@ import {
   SEED_SETTINGS,
 } from './db';
 import { RoutineDesigner } from './components/RoutineDesigner';
-import { OrdinanceEngine } from './components/OrdinanceEngine';
+import { AssessmentView } from './components/AssessmentView';
 import { CourseManager } from './components/CourseManager';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { WelcomeTutorialModal } from './components/WelcomeTutorialModal';
@@ -623,14 +623,10 @@ export function App() {
           </div>
         )}
 
-        {/* Tab 2: Assessment Engine */}
+        {/* Tab 2: Minimalist Assessment Tab (Connected to useSemesterStore) */}
         {activeTab === 'assessment' && (
           <div className="p-8 w-full max-w-[1380px] mx-auto animate-fade-in">
-            <OrdinanceEngine
-              courses={courses}
-              onUpdateCourse={handleUpdateCourse}
-              onLoadSampleRoutine={handleLoadSampleRoutine}
-            />
+            <AssessmentView />
           </div>
         )}
 
