@@ -626,36 +626,19 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
               {/* Header Row: Periods 1 to 6, BREAK, Period 7 (Lab) */}
               <thead>
                 <tr className="border-b border-white/[0.06] bg-[#0d0e11]">
-                  <th className="w-20 p-3 text-[11px] font-mono text-zinc-400 uppercase tracking-wider text-center">
+                  <th className="w-16 p-3 text-xs font-mono font-semibold text-zinc-400 uppercase tracking-wider text-center border-r border-white/[0.06]">
                     Day
                   </th>
-                  {PERIODS.map((p) => {
-                    if (p.isBreak) {
-                      return (
-                        <th
-                          key="break-header"
-                          className="w-14 p-2 text-center border-l border-white/[0.06] bg-transparent"
-                        >
-                          <span className="text-[10px] font-mono tracking-widest text-zinc-400 block">
-                            RECESS
-                          </span>
-                          <span className="text-[9px] font-mono text-zinc-400 block mt-0.5">
-                            1:30 - 2:30
-                          </span>
-                        </th>
-                      );
-                    }
-
+                  {[1, 2, 3, 4, 5, 6].map((pId) => {
+                    const p = PERIODS.find((item) => item.id === pId)!;
                     return (
                       <th
                         key={p.id}
-                        className={`p-3 border-l border-white/[0.06] ${
-                          p.id === 7 ? 'w-44' : 'w-[12%]'
-                        }`}
+                        className="p-3 border-r border-white/[0.06] w-[11.8%]"
                       >
                         <div className="flex flex-col">
-                          <span className="text-xs font-medium text-zinc-300">
-                            {p.id === 7 ? 'Period 7 (Lab)' : p.name}
+                          <span className="text-xs font-semibold text-zinc-200">
+                            {p.name}
                           </span>
                           <span className="text-[11px] font-mono tabular-nums text-zinc-400 mt-0.5">
                             {p.timeRange}
@@ -664,24 +647,40 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
                       </th>
                     );
                   })}
+                  <th className="w-14 p-2 text-center border-r border-white/[0.06] bg-zinc-950/30">
+                    <div className="flex flex-col items-center">
+                      <span className="text-[10px] font-mono tracking-widest text-amber-500/80 font-bold block">
+                        RECESS
+                      </span>
+                      <span className="text-[9px] font-mono text-zinc-400 block mt-0.5 tabular-nums">
+                        1:30 - 2:30
+                      </span>
+                    </div>
+                  </th>
+                  <th className="p-3 w-56">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-semibold text-zinc-200">
+                        Period 7 (Lab Block)
+                      </span>
+                      <span className="text-[11px] font-mono tabular-nums text-zinc-400 mt-0.5">
+                        2:30 - 5:00
+                      </span>
+                    </div>
+                  </th>
                 </tr>
               </thead>
 
               {/* Day Rows: Saturday to Wednesday */}
               <tbody className="divide-y divide-white/[0.06]">
-                {DAYS.map((day) => {
-                  // Track spanned periods to prevent duplicate rendering
+                {DAYS.map((day, dayIndex) => {
                   const spannedPeriodIds = new Set<number>();
 
                   return (
-                    <tr key={day} className="h-24">
+                    <tr key={day} className="h-28">
                       {/* Day Label Cell */}
-                      <td className="p-3 text-center bg-[#0d0e11] select-none">
-                        <span className="text-xs font-mono font-medium text-zinc-400 block uppercase">
+                      <td className="w-16 p-3 text-center bg-[#0d0e11] select-none border-r border-white/[0.06] align-middle">
+                        <span className="text-sm font-bold font-mono tracking-wider text-zinc-200 block uppercase">
                           {day.slice(0, 3)}
-                        </span>
-                        <span className="text-[10px] text-zinc-400 font-mono block mt-0.5">
-                          BUET
                         </span>
                       </td>
 
@@ -694,53 +693,56 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
                         const slot = slots.find((s) => s.day === day && s.periodId === pId);
                         const span = slot?.span || 1;
 
-                        // Mark subsequent covered periods
                         if (span > 1) {
                           for (let i = 1; i < span; i++) {
                             spannedPeriodIds.add(pId + i);
                           }
                         }
 
+                        const isSessional = slot?.type === 'sessional' || span > 1;
+
                         return (
                           <td
                             key={pId}
                             colSpan={span}
                             onClick={() => handleCellClick(day, pId)}
-                            className={`p-1.5 border-l border-white/[0.06] transition-colors relative group align-top ${
+                            className={`p-2 border-r border-white/[0.06] transition-colors relative group align-top ${
                               slot
-                                ? 'bg-zinc-900/40 hover:bg-zinc-800/50 cursor-pointer'
+                                ? 'bg-zinc-900/30 hover:bg-zinc-800/40 cursor-pointer'
                                 : 'hover:bg-white/[0.02] cursor-pointer'
                             }`}
                           >
                             {slot ? (
-                              <div className="h-full min-h-[76px] rounded-xl p-2.5 flex flex-col justify-between border border-white/[0.06] bg-zinc-900/90 hover:border-white/[0.12] transition-colors">
-                                {/* Line 1: Course Code & Subtle Category Pill */}
+                              <div
+                                className={`h-full min-h-[96px] rounded-xl p-3 flex flex-col justify-between border bg-zinc-900/90 hover:border-white/[0.14] transition-all relative ${
+                                  isSessional
+                                    ? 'border-violet-500/30 border-l-[3px] border-l-violet-400'
+                                    : 'border-white/[0.06]'
+                                }`}
+                              >
+                                {/* Line 1: Course Code & Optional Sessional/Lab tag (NO green theory badge!) */}
                                 <div className="flex items-center justify-between gap-1.5">
-                                  <span className="text-xs font-semibold font-mono tracking-tight text-zinc-100">
+                                  <span className="text-sm font-bold font-mono tracking-tight text-white">
                                     {slot.code}
                                   </span>
-                                  <span
-                                    className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-medium ${
-                                      slot.type === 'theory'
-                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                        : 'bg-violet-500/10 text-violet-400 border border-violet-500/20'
-                                    }`}
-                                  >
-                                    {slot.type === 'theory' ? 'Theory' : 'Lab'}
-                                  </span>
+                                  {isSessional && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-violet-500/15 text-violet-300 border border-violet-500/20">
+                                      Lab
+                                    </span>
+                                  )}
                                 </div>
 
                                 {/* Line 2: Course Nickname */}
-                                <div className="text-[11px] text-zinc-400 truncate mt-1">
+                                <div className="text-xs text-zinc-300 font-medium leading-snug mt-1 break-words">
                                   {slot.nickname}
                                 </div>
 
                                 {/* Line 3: Instructor & Room Tag */}
-                                <div className="text-[10px] text-zinc-400 font-mono flex items-center gap-1.5 truncate mt-2">
+                                <div className="text-xs text-zinc-400 font-mono flex flex-wrap items-center gap-1.5 pt-1.5 mt-auto">
                                   <span>{slot.teacher || 'TBA'}</span>
                                   {slot.room && (
                                     <>
-                                      <span>•</span>
+                                      <span className="text-zinc-600">•</span>
                                       <span className="text-zinc-400">{slot.room}</span>
                                     </>
                                   )}
@@ -748,7 +750,7 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
                               </div>
                             ) : (
                               /* Empty Cell: Quiet hover with faint '+' icon */
-                              <div className="h-full min-h-[76px] flex items-center justify-center">
+                              <div className="h-full min-h-[96px] flex items-center justify-center">
                                 <Plus className="w-4 h-4 text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
                               </div>
                             )}
@@ -756,14 +758,22 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
                         );
                       })}
 
-                      {/* Calm Vertical BREAK Column */}
-                      <td className="w-14 border-l border-white/[0.06] text-center bg-transparent select-none p-1">
-                        <div className="h-full min-h-[76px] flex flex-col items-center justify-center opacity-40">
-                          <span className="text-[9px] font-mono tracking-widest text-zinc-400 [writing-mode:vertical-rl] rotate-180">
-                            BREAK
-                          </span>
-                        </div>
-                      </td>
+                      {/* Unbroken Recess Column */}
+                      {dayIndex === 0 && (
+                        <td
+                          rowSpan={DAYS.length}
+                          className="w-14 border-r border-white/[0.06] text-center bg-zinc-950/50 select-none p-2 align-middle"
+                        >
+                          <div className="h-full min-h-[520px] flex flex-col items-center justify-center gap-4">
+                            <span className="text-[10px] font-mono font-semibold tracking-[0.25em] text-amber-500/80 [writing-mode:vertical-rl] rotate-180 uppercase select-none">
+                              PRAYER & LUNCH BREAK
+                            </span>
+                            <span className="text-[9px] font-mono text-zinc-400 [writing-mode:vertical-rl] rotate-180 tabular-nums">
+                              1:30 — 2:30 PM
+                            </span>
+                          </div>
+                        </td>
+                      )}
 
                       {/* Period 7 (Afternoon Lab Slot) */}
                       {(() => {
@@ -771,37 +781,37 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
                         return (
                           <td
                             onClick={() => handleCellClick(day, 7)}
-                            className={`p-1.5 border-l border-white/[0.06] transition-colors relative group align-top ${
+                            className={`p-2 transition-colors relative group align-top ${
                               slot
-                                ? 'bg-zinc-900/40 hover:bg-zinc-800/50 cursor-pointer'
+                                ? 'bg-zinc-900/30 hover:bg-zinc-800/40 cursor-pointer'
                                 : 'hover:bg-white/[0.02] cursor-pointer'
                             }`}
                           >
                             {slot ? (
-                              <div className="h-full min-h-[76px] rounded-xl p-2.5 flex flex-col justify-between border border-white/[0.06] bg-zinc-900/90 hover:border-white/[0.12] transition-colors">
+                              <div className="h-full min-h-[96px] rounded-xl p-3 flex flex-col justify-between border border-violet-500/30 border-l-[3px] border-l-violet-400 bg-zinc-900/90 hover:border-white/[0.14] transition-all">
                                 <div className="flex items-center justify-between gap-1.5">
-                                  <span className="text-xs font-semibold font-mono tracking-tight text-zinc-100">
+                                  <span className="text-sm font-bold font-mono tracking-tight text-white">
                                     {slot.code}
                                   </span>
-                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-medium bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-violet-500/15 text-violet-300 border border-violet-500/20">
                                     Lab Block
                                   </span>
                                 </div>
-                                <div className="text-[11px] text-zinc-400 truncate mt-1">
+                                <div className="text-xs text-zinc-300 font-medium leading-snug mt-1 break-words">
                                   {slot.nickname}
                                 </div>
-                                <div className="text-[10px] text-zinc-400 font-mono flex items-center gap-1.5 truncate mt-2">
+                                <div className="text-xs text-zinc-400 font-mono flex flex-wrap items-center gap-1.5 pt-1.5 mt-auto">
                                   <span>{slot.teacher || 'Lab Instructors'}</span>
                                   {slot.room && (
                                     <>
-                                      <span>•</span>
+                                      <span className="text-zinc-600">•</span>
                                       <span className="text-zinc-400">{slot.room}</span>
                                     </>
                                   )}
                                 </div>
                               </div>
                             ) : (
-                              <div className="h-full min-h-[76px] flex items-center justify-center">
+                              <div className="h-full min-h-[96px] flex items-center justify-center">
                                 <Plus className="w-4 h-4 text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
                               </div>
                             )}

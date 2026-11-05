@@ -24,75 +24,10 @@ function createWindow() {
       webSecurity: true,
     },
     frame: true,
-    autoHideMenuBar: false
+    autoHideMenuBar: true
   });
 
-  const menuTemplate = [
-    {
-      label: 'File',
-      submenu: [
-        {
-          label: 'Export Routine (Ctrl+E)',
-          accelerator: 'CmdOrCtrl+E',
-          click: () => mainWindow?.webContents.send('trigger-export-routine')
-        },
-        {
-          label: 'Print Routine (Ctrl+P)',
-          accelerator: 'CmdOrCtrl+P',
-          click: () => mainWindow?.webContents.send('trigger-print-routine')
-        },
-        {
-          label: 'Save / Sync Database (Ctrl+S)',
-          accelerator: 'CmdOrCtrl+S',
-          click: () => mainWindow?.webContents.send('trigger-save-db')
-        },
-        { type: 'separator' },
-        {
-          label: 'Backup Data as JSON...',
-          click: () => mainWindow?.webContents.send('trigger-backup-json')
-        },
-        {
-          label: 'Restore Data from JSON...',
-          click: () => mainWindow?.webContents.send('trigger-restore-json')
-        },
-        { type: 'separator' },
-        { role: 'quit' }
-      ]
-    },
-    {
-      label: 'View',
-      submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { type: 'separator' },
-        { role: 'togglefullscreen' }
-      ]
-    },
-    {
-      label: 'Help',
-      submenu: [
-        {
-          label: 'About BUETracker',
-          click: () => {
-            dialog.showMessageBox(mainWindow, {
-              type: 'info',
-              title: 'About BUETracker',
-              message: 'BUETracker - BUET Academic Suite (Native PC)',
-              detail: 'Tailored for Bangladesh University of Engineering and Technology (BUET) students.\n\nModules:\n• Module A: Official Period Routine Designer & High-Res Exporter\n• Module B: Course & Semester Management with BIIS Parser\n• Module C: BUET Ordinance Continuous Assessment Engine\n• Module D: CGPA Trajectory & Analytics Dashboard\n\nVersion 1.0.0 (Native Windows Application)'
-            });
-          }
-        }
-      ]
-    }
-  ];
-
-  const menu = Menu.buildFromTemplate(menuTemplate);
-  Menu.setApplicationMenu(menu);
+  Menu.setApplicationMenu(null);
 
   const distIndexPath = path.join(__dirname, '../dist/index.html');
 

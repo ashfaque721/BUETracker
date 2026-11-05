@@ -23,19 +23,14 @@ import { SettingsModal } from './components/SettingsModal';
 import { StudentSetupWizard } from './components/StudentSetupWizard';
 import { calculateGPA } from './utils/buetOrdinance';
 import {
-  Calendar,
-  Calculator,
-  BookOpen,
-  BarChart3,
   Settings,
   Sparkles,
-  GraduationCap,
-  Play,
-  ArrowRight,
-  MoreHorizontal,
-  RotateCcw,
+  ChevronDown,
+  Download,
   FileDown,
 } from 'lucide-react';
+import { toPng } from 'html-to-image';
+import jsPDF from 'jspdf';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'routine' | 'assessment' | 'courses' | 'analytics'>('routine');
@@ -54,19 +49,92 @@ export function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
-  const [isTopMenuOpen, setIsTopMenuOpen] = useState(false);
 
-  const topMenuRef = useRef<HTMLDivElement>(null);
+  // Editable Title State (Left top bar)
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleText, setTitleText] = useState(routine.title || "Class Routine — IPE'23 Section A");
+
+  // Export State (Right top bar)
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (routine.title) {
+      setTitleText(routine.title);
+    }
+  }, [routine.title]);
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
-      if (topMenuRef.current && !topMenuRef.current.contains(e.target as Node)) {
-        setIsTopMenuOpen(false);
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target as Node)) {
+        setIsExportOpen(false);
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
+
+  const handleTitleBlur = () => {
+    setIsEditingTitle(false);
+    if (titleText.trim() && titleText !== routine.title) {
+      handleUpdateRoutine({
+        ...routine,
+        title: titleText.trim(),
+      });
+    }
+  };
+
+  const handleExportPNG = async () => {
+    const el = document.getElementById('buet-timetable-grid');
+    if (!el) return;
+    setIsExportOpen(false);
+    setIsExporting(true);
+    try {
+      const dataUrl = await toPng(el, {
+        pixelRatio: 2,
+        backgroundColor: '#0d0e11',
+      });
+      const link = document.createElement('a');
+      link.download = `${(routine.title || 'Class_Routine').replace(/\s+/g, '_')}.png`;
+      link.href = dataUrl;
+      link.click();
+      showToast('Exported routine as high-res PNG');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to export PNG');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    const el = document.getElementById('buet-timetable-grid');
+    if (!el) return;
+    setIsExportOpen(false);
+    setIsExporting(true);
+    try {
+      const dataUrl = await toPng(el, {
+        pixelRatio: 2,
+        backgroundColor: '#0d0e11',
+      });
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4',
+      });
+      const imgWidth = 280;
+      const imgHeight = (el.offsetHeight * imgWidth) / el.offsetWidth;
+      pdf.addImage(dataUrl, 'PNG', 8, 12, imgWidth, Math.min(imgHeight, 185));
+      pdf.save(`${(routine.title || 'Class_Routine').replace(/\s+/g, '_')}.pdf`);
+      showToast('Exported routine as landscape PDF');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to export PDF');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -326,20 +394,51 @@ export function App() {
   return (
     <div className="min-h-screen bg-[#0d0e11] text-zinc-300 flex flex-col font-sans selection:bg-emerald-950 selection:text-emerald-200 antialiased">
       {/* ----------------------------------------------------------------- */}
-      {/* Single, Unified Top Bar with Simulated Window Controls             */}
+      {/* 1. Single Consolidated Top Bar (Native Desktop Standard)          */}
       {/* ----------------------------------------------------------------- */}
-      <header className="h-12 border-b border-white/[0.06] bg-[#0d0e11] px-4 flex items-center justify-between select-none shrink-0 sticky top-0 z-40 no-print">
-        {/* Left: App Title & Small Term Pill */}
-        <div className="flex items-center gap-2.5">
-          <span className="text-xs font-semibold tracking-tight text-zinc-100">
-            BUET Tracker
-          </span>
-          <span className="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.06] text-[11px] font-mono tabular-nums text-zinc-400">
-            {deptShort} • {termShort}
-          </span>
+      <header className="h-12 border-b border-white/[0.06] bg-[#0d0e11] px-6 flex items-center justify-between select-none shrink-0 sticky top-0 z-40 no-print">
+        {/* Left: Clean title "Class Routine — IPE'23 Section A" (editable inline) */}
+        <div className="flex items-center gap-3 min-w-[280px]">
+          {activeTab === 'routine' ? (
+            isEditingTitle ? (
+              <input
+                type="text"
+                autoFocus
+                value={titleText}
+                onChange={(e) => setTitleText(e.target.value)}
+                onBlur={handleTitleBlur}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleTitleBlur();
+                }}
+                className="bg-transparent text-sm font-semibold tracking-tight text-white border-b border-white/30 focus:outline-none pb-0.5"
+              />
+            ) : (
+              <h1
+                onClick={() => setIsEditingTitle(true)}
+                className="text-sm font-semibold tracking-tight text-zinc-100 hover:text-white cursor-pointer group flex items-center gap-2"
+                title="Click to rename routine"
+              >
+                <span>{titleText}</span>
+                <span className="opacity-0 group-hover:opacity-40 text-xs font-normal text-zinc-400">
+                  ✎
+                </span>
+              </h1>
+            )
+          ) : (
+            <div className="flex items-center gap-2.5">
+              <span className="text-sm font-semibold tracking-tight text-zinc-100">
+                {activeTab === 'assessment' && 'Continuous Assessment'}
+                {activeTab === 'courses' && 'Course Catalog & Semesters'}
+                {activeTab === 'analytics' && 'CGPA Trajectory & Analytics'}
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.06] text-[11px] font-mono tabular-nums text-zinc-400">
+                {deptShort} • {termShort}
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Center: Clean Segmented Pill Navigation */}
+        {/* Center: Minimal Segmented View Switch */}
         <nav className="flex items-center p-0.5 rounded-lg bg-zinc-900/90 border border-white/[0.06]">
           {(['routine', 'assessment', 'courses', 'analytics'] as const).map((tab) => {
             const isActive = activeTab === tab;
@@ -360,87 +459,60 @@ export function App() {
           })}
         </nav>
 
-        {/* Right: Secondary Menu & Simulated Desktop Window Controls */}
-        <div className="flex items-center gap-3">
-          {/* Secondary '···' Icon Button */}
-          <div className="relative" ref={topMenuRef}>
-            <button
-              onClick={() => setIsTopMenuOpen(!isTopMenuOpen)}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.04] transition-colors"
-              title="Application options"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
+        {/* Right: Subtle [ Export ▾ ] and small [ Load Sample ] ghost button */}
+        <div className="flex items-center gap-3 min-w-[280px] justify-end">
+          {activeTab === 'routine' && (
+            <>
+              {/* Load Sample Ghost Button */}
+              <button
+                onClick={handleLoadSampleRoutine}
+                className="text-xs text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] px-2.5 py-1.5 rounded-lg transition-colors"
+                title="Reset to BUET sample template"
+              >
+                Load Sample
+              </button>
 
-            {isTopMenuOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-52 rounded-xl bg-[#14151a] border border-white/[0.08] shadow-2xl p-1.5 z-50 text-xs">
-                <div className="px-2.5 py-1.5 border-b border-white/[0.06] mb-1">
-                  <span className="text-[10px] font-mono uppercase text-zinc-500 font-semibold block">
-                    Student Profile
-                  </span>
-                  <span className="text-zinc-200 font-medium truncate block">
-                    {settings.studentName || 'BUET Student'}
-                  </span>
-                  <span className="text-[11px] font-mono text-emerald-400 font-semibold block mt-0.5">
-                    {overallCgpa.gpa.toFixed(2)} CGPA
-                  </span>
-                </div>
-
+              {/* Subtle Export ▾ Dropdown Button */}
+              <div className="relative" ref={exportDropdownRef}>
                 <button
-                  onClick={() => {
-                    setShowSettingsModal(true);
-                    setIsTopMenuOpen(false);
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/[0.04] text-zinc-300 hover:text-zinc-100 transition-colors flex items-center gap-2"
+                  onClick={() => setIsExportOpen(!isExportOpen)}
+                  disabled={isExporting}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-medium border border-white/[0.08] transition-colors shadow-xs"
                 >
-                  <Settings className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>Settings & Data</span>
+                  <span>{isExporting ? 'Exporting...' : 'Export'}</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
                 </button>
 
-                <button
-                  onClick={() => {
-                    setShowTutorial(true);
-                    setIsTopMenuOpen(false);
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/[0.04] text-zinc-300 hover:text-zinc-100 transition-colors flex items-center gap-2"
-                >
-                  <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Interactive Tour</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    handleExportBackup();
-                    setIsTopMenuOpen(false);
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/[0.04] text-zinc-300 hover:text-zinc-100 transition-colors flex items-center gap-2"
-                >
-                  <FileDown className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Backup Database (JSON)</span>
-                </button>
-
-                <div className="border-t border-white/[0.06] my-1" />
-
-                <button
-                  onClick={() => {
-                    handleLoadSampleRoutine();
-                    setIsTopMenuOpen(false);
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/[0.04] text-zinc-300 hover:text-zinc-100 transition-colors flex items-center gap-2"
-                >
-                  <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>Load Sample Routine</span>
-                </button>
+                {isExportOpen && (
+                  <div className="absolute right-0 top-full mt-1.5 w-40 rounded-xl bg-[#14151a] border border-white/[0.08] shadow-2xl p-1 z-50 text-xs">
+                    <button
+                      onClick={handleExportPNG}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/[0.04] text-zinc-200 transition-colors flex items-center gap-2"
+                    >
+                      <Download className="w-3.5 h-3.5 text-zinc-400" />
+                      <span>Save as PNG</span>
+                    </button>
+                    <button
+                      onClick={handleExportPDF}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/[0.04] text-zinc-200 transition-colors flex items-center gap-2"
+                    >
+                      <FileDown className="w-3.5 h-3.5 text-zinc-400" />
+                      <span>Save as PDF</span>
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
 
-          {/* Simulated Window Controls */}
-          <div className="flex items-center gap-1.5 pl-2.5 border-l border-white/[0.08]">
-            <span className="w-3 h-3 rounded-full bg-zinc-800 hover:bg-red-500/80 transition-colors cursor-pointer" />
-            <span className="w-3 h-3 rounded-full bg-zinc-800 hover:bg-amber-500/80 transition-colors cursor-pointer" />
-            <span className="w-3 h-3 rounded-full bg-zinc-800 hover:bg-emerald-500/80 transition-colors cursor-pointer" />
-          </div>
+          {/* Settings & Profile Quick Toggle */}
+          <button
+            onClick={() => setShowSettingsModal(true)}
+            className="w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.04] transition-colors"
+            title="Settings & Data"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
         </div>
       </header>
 
@@ -452,8 +524,8 @@ export function App() {
         </div>
       )}
 
-      {/* Main Workspace */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 animate-fade-in">
+      {/* Main Workspace: Expanded Hero Canvas */}
+      <main className="flex-1 w-full px-6 py-4 flex flex-col animate-fade-in">
         {/* Tab 1: Routine Designer */}
         {activeTab === 'routine' && (
           <RoutineDesigner
@@ -466,62 +538,40 @@ export function App() {
 
         {/* Tab 2: Assessment Engine */}
         {activeTab === 'assessment' && (
-          <OrdinanceEngine
-            courses={courses}
-            onUpdateCourse={handleUpdateCourse}
-            onLoadSampleRoutine={handleLoadSampleRoutine}
-          />
+          <div className="max-w-7xl w-full mx-auto">
+            <OrdinanceEngine
+              courses={courses}
+              onUpdateCourse={handleUpdateCourse}
+              onLoadSampleRoutine={handleLoadSampleRoutine}
+            />
+          </div>
         )}
 
         {/* Tab 3: Courses Manager */}
         {activeTab === 'courses' && (
-          <CourseManager
-            courses={courses}
-            activeSemesterId={settings.currentSemesterId}
-            onSelectSemester={(semId) => setSettings({ ...settings, currentSemesterId: semId })}
-            onAddCourse={handleAddCourse}
-            onUpdateCourse={handleUpdateCourse}
-            onDeleteCourse={handleDeleteCourse}
-            onBulkAddCourses={handleBulkAddCourses}
-          />
+          <div className="max-w-7xl w-full mx-auto">
+            <CourseManager
+              courses={courses}
+              activeSemesterId={settings.currentSemesterId}
+              onSelectSemester={(semId) => setSettings({ ...settings, currentSemesterId: semId })}
+              onAddCourse={handleAddCourse}
+              onUpdateCourse={handleUpdateCourse}
+              onDeleteCourse={handleDeleteCourse}
+              onBulkAddCourses={handleBulkAddCourses}
+            />
+          </div>
         )}
 
         {/* Tab 4: Analytics Dashboard */}
         {activeTab === 'analytics' && (
-          <AnalyticsDashboard
-            courses={courses}
-            settings={settings}
-          />
+          <div className="max-w-7xl w-full mx-auto">
+            <AnalyticsDashboard
+              courses={courses}
+              settings={settings}
+            />
+          </div>
         )}
       </main>
-
-      {/* Minimal Footer */}
-      <footer className="border-t border-white/[0.06] py-3.5 px-6 text-center text-xs text-zinc-400 no-print">
-        <div className="flex flex-wrap items-center justify-between max-w-7xl mx-auto gap-4">
-          <div className="flex items-center gap-2 text-[11px]">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <span className="text-zinc-400">Offline SQLite/IndexedDB Active • Fully Private</span>
-          </div>
-          <div className="text-[11px] text-zinc-400">
-            BUETracker • Bangladesh University of Engineering and Technology
-          </div>
-          <div className="flex items-center gap-3 text-[11px]">
-            <button
-              onClick={() => setShowTutorial(true)}
-              className="text-zinc-400 hover:text-zinc-200 transition font-medium"
-            >
-              App Tour
-            </button>
-            <span>•</span>
-            <button
-              onClick={() => setShowSettingsModal(true)}
-              className="text-zinc-400 hover:text-zinc-200 transition font-medium"
-            >
-              Settings & Data
-            </button>
-          </div>
-        </div>
-      </footer>
 
       {/* Welcome Stepwise Tutorial Modal */}
       <WelcomeTutorialModal
