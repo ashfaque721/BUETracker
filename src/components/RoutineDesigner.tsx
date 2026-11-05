@@ -133,32 +133,34 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
   };
 
   return (
-    <div className="w-full flex flex-col flex-1">
+    <div className="w-full flex flex-col items-center justify-center">
       {/* ----------------------------------------------------------------- */}
-      {/* Hero Workspace: Edge-to-Edge Timetable Grid                        */}
+      {/* Hero Workspace: Centered Timetable Grid                            */}
       {/* ----------------------------------------------------------------- */}
       <div
         id="buet-timetable-grid"
         ref={timetableRef}
-        className="w-full rounded-2xl border border-white/[0.06] bg-[#0d0e11] overflow-hidden shadow-sm flex-1 flex flex-col"
+        className="w-full rounded-2xl border border-white/[0.06] bg-[#0d0e11] overflow-hidden shadow-sm"
       >
-        <div className="overflow-x-auto w-full flex-1">
-          <table className="w-full border-collapse text-left table-fixed min-w-[1080px]">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full border-collapse table-fixed min-w-[1040px]">
             {/* Header: Day, Periods 1-6, RECESS, Period 7 (Lab) */}
             <thead>
               <tr className="border-b border-white/[0.06] bg-[#0d0e11]">
                 {/* Day Header (SAT..WED) */}
-                <th className="w-16 p-3 text-xs font-mono font-semibold text-zinc-400 uppercase tracking-wider text-center border-r border-white/[0.06]">
-                  Day
+                <th className="w-16 p-2.5 text-center border-r border-white/[0.06]">
+                  <span className="text-xs font-mono font-semibold text-zinc-400 uppercase tracking-wider block">
+                    Day
+                  </span>
                 </th>
 
                 {/* Periods 1 to 6 */}
                 {PERIODS.map((p) => (
                   <th
                     key={p.id}
-                    className="p-3 border-r border-white/[0.06] w-[11.8%]"
+                    className="p-2.5 border-r border-white/[0.06] w-[12%] text-center"
                   >
-                    <div className="flex flex-col">
+                    <div className="flex flex-col items-center justify-center text-center">
                       <span className="text-xs font-semibold text-zinc-200">
                         {p.name}
                       </span>
@@ -170,8 +172,8 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                 ))}
 
                 {/* Continuous Recess Header */}
-                <th className="w-14 p-2 text-center border-r border-white/[0.06] bg-zinc-950/30">
-                  <div className="flex flex-col items-center">
+                <th className="w-14 p-2 text-center border-r border-white/[0.06] bg-zinc-950/40">
+                  <div className="flex flex-col items-center justify-center text-center">
                     <span className="text-[10px] font-mono tracking-widest text-amber-500/80 font-bold block">
                       RECESS
                     </span>
@@ -182,10 +184,10 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                 </th>
 
                 {/* Period 7 (Afternoon Lab Block) */}
-                <th className="p-3 w-56">
-                  <div className="flex flex-col">
+                <th className="p-2.5 w-52 text-center">
+                  <div className="flex flex-col items-center justify-center text-center">
                     <span className="text-xs font-semibold text-zinc-200">
-                      Period 7 (Lab Block)
+                      Period 7 (Lab)
                     </span>
                     <span className="text-[11px] font-mono tabular-nums text-zinc-400 mt-0.5">
                       2:30 - 5:00
@@ -203,7 +205,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                 return (
                   <tr key={day} className="h-28">
                     {/* Day Column (Left): SAT, SUN, MON, TUE, WED */}
-                    <td className="w-16 p-3 text-center bg-[#0d0e11] select-none border-r border-white/[0.06] align-middle">
+                    <td className="w-16 p-2.5 text-center bg-[#0d0e11] select-none border-r border-white/[0.06] align-middle">
                       <span className="text-sm font-bold font-mono tracking-wider text-zinc-200 block uppercase">
                         {day.slice(0, 3)}
                       </span>
@@ -238,53 +240,39 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                           key={pId}
                           colSpan={span}
                           onClick={() => handleCellClick(day, pId)}
-                          className={`p-2 border-r border-white/[0.06] transition-colors relative group align-top ${
+                          className={`p-1.5 border-r border-white/[0.06] transition-colors align-middle cursor-pointer ${
                             slot
-                              ? 'bg-zinc-900/30 hover:bg-zinc-800/40 cursor-pointer'
-                              : 'hover:bg-white/[0.02] cursor-pointer'
+                              ? 'bg-zinc-900/30 hover:bg-zinc-800/40'
+                              : 'hover:bg-white/[0.02]'
                           }`}
                         >
                           {slot ? (
                             <div
-                              className={`h-full min-h-[96px] rounded-xl p-3 flex flex-col justify-between border bg-zinc-900/90 hover:border-white/[0.14] transition-all relative ${
+                              className={`h-full min-h-[96px] rounded-xl border bg-zinc-900/90 hover:border-white/[0.14] transition-all flex flex-col items-center justify-center text-center p-2.5 cursor-pointer relative ${
                                 isSessional
                                   ? 'border-violet-500/30 border-l-[3px] border-l-violet-400'
                                   : 'border-white/[0.06]'
                               }`}
                             >
-                              {/* Line 1: Course Code & Optional Sessional/Lab tag (NO green theory badge!) */}
-                              <div className="flex items-center justify-between gap-1.5">
-                                <span className="text-sm font-bold font-mono tracking-tight text-white">
-                                  {slot.customCode || 'CLASS'}
-                                </span>
-                                {isSessional && (
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-violet-500/15 text-violet-300 border border-violet-500/20">
-                                    Lab
-                                  </span>
-                                )}
-                              </div>
+                              {/* Line 1: Course Code */}
+                              <span className="text-sm font-semibold tracking-tight text-white block">
+                                {slot.customCode || 'CLASS'}
+                              </span>
 
-                              {/* Line 2: Topic / Nickname (Clear text, wraps cleanly) */}
-                              <div className="text-xs text-zinc-300 font-medium leading-snug mt-1 break-words">
+                              {/* Line 2: Topic in clean muted text 12px */}
+                              <span className="text-xs font-medium text-zinc-300 mt-0.5 block truncate max-w-full">
                                 {(slot.customNickname || slot.customCode || '').replace(/^\(|\)$/g, '')}
-                              </div>
+                              </span>
 
-                              {/* Line 3: Teacher & Room (No awkward ellipses, wraps cleanly) */}
-                              <div className="text-xs text-zinc-400 font-mono flex flex-wrap items-center gap-1.5 pt-1.5 mt-auto">
-                                <span>{slot.customTeacher || 'TBA'}</span>
-                                {slot.customRoom && (
-                                  <>
-                                    <span className="text-zinc-600">•</span>
-                                    <span className="text-zinc-400">
-                                      {slot.customRoom.replace(/^Room:\s*/i, '')}
-                                    </span>
-                                  </>
-                                )}
-                              </div>
+                              {/* Line 3: Instructor & Room in 11px mono tag */}
+                              <span className="text-[11px] font-mono text-zinc-400 mt-1 block truncate max-w-full">
+                                {slot.customTeacher || 'TBA'}
+                                {slot.customRoom && ` • ${slot.customRoom.replace(/^Room:\s*/i, '')}`}
+                              </span>
                             </div>
                           ) : (
-                            /* Empty Slot: Quiet hover with faint '+' icon */
-                            <div className="h-full min-h-[96px] flex items-center justify-center">
+                            /* Empty Slot with Subtle Hairline Outline */
+                            <div className="h-full min-h-[96px] rounded-xl border border-white/[0.05] hover:border-white/[0.12] hover:bg-white/[0.02] flex items-center justify-center transition-all cursor-pointer group">
                               <Plus className="w-4 h-4 text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
                             </div>
                           )}
@@ -292,7 +280,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                       );
                     })}
 
-                    {/* Unbroken Recess Column: Single continuous vertical divider running down the entire height of the 5 days */}
+                    {/* Unbroken Recess Column: Single continuous vertical divider running down the entire 5 days */}
                     {dayIndex === 0 && (
                       <td
                         rowSpan={DAYS.length}
@@ -315,39 +303,33 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                       return (
                         <td
                           onClick={() => handleCellClick(day, 7)}
-                          className={`p-2 transition-colors relative group align-top ${
+                          className={`p-1.5 transition-colors align-middle cursor-pointer ${
                             slot
-                              ? 'bg-zinc-900/30 hover:bg-zinc-800/40 cursor-pointer'
-                              : 'hover:bg-white/[0.02] cursor-pointer'
+                              ? 'bg-zinc-900/30 hover:bg-zinc-800/40'
+                              : 'hover:bg-white/[0.02]'
                           }`}
                         >
                           {slot ? (
-                            <div className="h-full min-h-[96px] rounded-xl p-3 flex flex-col justify-between border border-violet-500/30 border-l-[3px] border-l-violet-400 bg-zinc-900/90 hover:border-white/[0.14] transition-all">
-                              <div className="flex items-center justify-between gap-1.5">
-                                <span className="text-sm font-bold font-mono tracking-tight text-white">
-                                  {slot.customCode || 'LAB'}
-                                </span>
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-violet-500/15 text-violet-300 border border-violet-500/20">
-                                  Lab Block
-                                </span>
-                              </div>
-                              <div className="text-xs text-zinc-300 font-medium leading-snug mt-1 break-words">
+                            <div className="h-full min-h-[96px] rounded-xl border border-violet-500/30 border-l-[3px] border-l-violet-400 bg-zinc-900/90 hover:border-white/[0.14] transition-all flex flex-col items-center justify-center text-center p-2.5 cursor-pointer relative">
+                              {/* Line 1: Course Code */}
+                              <span className="text-sm font-semibold tracking-tight text-white block">
+                                {slot.customCode || 'LAB'}
+                              </span>
+
+                              {/* Line 2: Topic in clean muted text 12px */}
+                              <span className="text-xs font-medium text-zinc-300 mt-0.5 block truncate max-w-full">
                                 {(slot.customNickname || slot.customCode || '').replace(/^\(|\)$/g, '')}
-                              </div>
-                              <div className="text-xs text-zinc-400 font-mono flex flex-wrap items-center gap-1.5 pt-1.5 mt-auto">
-                                <span>{slot.customTeacher || 'Lab Instructors'}</span>
-                                {slot.customRoom && (
-                                  <>
-                                    <span className="text-zinc-600">•</span>
-                                    <span className="text-zinc-400">
-                                      {slot.customRoom.replace(/^Room:\s*/i, '')}
-                                    </span>
-                                  </>
-                                )}
-                              </div>
+                              </span>
+
+                              {/* Line 3: Instructor & Room in 11px mono tag */}
+                              <span className="text-[11px] font-mono text-zinc-400 mt-1 block truncate max-w-full">
+                                {slot.customTeacher || 'Lab Instructors'}
+                                {slot.customRoom && ` • ${slot.customRoom.replace(/^Room:\s*/i, '')}`}
+                              </span>
                             </div>
                           ) : (
-                            <div className="h-full min-h-[96px] flex items-center justify-center">
+                            /* Empty Lab Slot with Subtle Hairline Outline */
+                            <div className="h-full min-h-[96px] rounded-xl border border-white/[0.05] hover:border-white/[0.12] hover:bg-white/[0.02] flex items-center justify-center transition-all cursor-pointer group">
                               <Plus className="w-4 h-4 text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
                             </div>
                           )}
@@ -380,7 +362,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
               <button
                 type="button"
                 onClick={() => setEditingCell(null)}
-                className="text-zinc-500 hover:text-zinc-300 transition-colors"
+                className="text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -396,7 +378,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                   <select
                     value={formCourseId}
                     onChange={(e) => handleCourseSelect(e.target.value)}
-                    className="w-full bg-[#1b1d24] border border-white/[0.08] rounded-lg px-2.5 py-1.5 text-zinc-200 focus:outline-none focus:border-white/20 transition-colors"
+                    className="w-full bg-[#1b1d24] border border-white/[0.08] rounded-lg px-2.5 py-1.5 text-zinc-200 focus:outline-none focus:border-white/20 transition-colors cursor-pointer"
                   >
                     <option value="">-- Custom or Select Course --</option>
                     {courses.map((c) => (
@@ -446,7 +428,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                   <button
                     type="button"
                     onClick={() => setFormType('theory')}
-                    className={`py-1.5 px-3 rounded-lg border text-xs font-medium transition-colors ${
+                    className={`py-1.5 px-3 rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
                       formType === 'theory'
                         ? 'bg-white/[0.08] text-zinc-100 border-white/20'
                         : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:bg-white/[0.04]'
@@ -457,7 +439,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                   <button
                     type="button"
                     onClick={() => setFormType('sessional')}
-                    className={`py-1.5 px-3 rounded-lg border text-xs font-medium transition-colors ${
+                    className={`py-1.5 px-3 rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
                       formType === 'sessional'
                         ? 'bg-violet-500/15 text-violet-300 border-violet-500/30'
                         : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:bg-white/[0.04]'
@@ -511,7 +493,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                           value={num}
                           checked={formSpan === num}
                           onChange={() => setFormSpan(num)}
-                          className="accent-violet-500"
+                          className="accent-violet-500 cursor-pointer"
                         />
                         <span>{num} {num === 1 ? 'Period (50m)' : `Periods (${num * 50}m)`}</span>
                       </label>
@@ -526,7 +508,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                   <button
                     type="button"
                     onClick={handleDeleteSlot}
-                    className="flex items-center gap-1.5 text-red-400 hover:text-red-300 text-xs py-1.5 px-2 rounded-lg hover:bg-red-500/10 transition-colors"
+                    className="flex items-center gap-1.5 text-red-400 hover:text-red-300 text-xs py-1.5 px-2 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Delete Slot</span>
@@ -539,13 +521,13 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                   <button
                     type="button"
                     onClick={() => setEditingCell(null)}
-                    className="px-3 py-1.5 rounded-lg border border-white/[0.08] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.02] transition-colors"
+                    className="px-3 py-1.5 rounded-lg border border-white/[0.08] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.02] transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-1.5 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 font-medium transition-colors shadow-xs"
+                    className="px-4 py-1.5 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 font-medium transition-colors shadow-xs cursor-pointer"
                   >
                     Save Slot
                   </button>

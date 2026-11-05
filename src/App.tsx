@@ -23,6 +23,10 @@ import { SettingsModal } from './components/SettingsModal';
 import { StudentSetupWizard } from './components/StudentSetupWizard';
 import { calculateGPA } from './utils/buetOrdinance';
 import {
+  Calendar,
+  Calculator,
+  BookOpen,
+  BarChart3,
   Settings,
   Sparkles,
   ChevronDown,
@@ -392,153 +396,177 @@ export function App() {
     : 'L-2 T-1';
 
   return (
-    <div className="min-h-screen bg-[#0d0e11] text-zinc-300 flex flex-col font-sans selection:bg-emerald-950 selection:text-emerald-200 antialiased">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#0d0e11] text-zinc-100 select-none font-sans antialiased">
       {/* ----------------------------------------------------------------- */}
-      {/* 1. Single Consolidated Top Bar (Native Desktop Standard)          */}
+      {/* 1. Left Desktop Sidebar Navigation                                */}
       {/* ----------------------------------------------------------------- */}
-      <header className="h-12 border-b border-white/[0.06] bg-[#0d0e11] px-6 flex items-center justify-between select-none shrink-0 sticky top-0 z-40 no-print">
-        {/* Left: Clean title "Class Routine — IPE'23 Section A" (editable inline) */}
-        <div className="flex items-center gap-3 min-w-[280px]">
-          {activeTab === 'routine' ? (
-            isEditingTitle ? (
-              <input
-                type="text"
-                autoFocus
-                value={titleText}
-                onChange={(e) => setTitleText(e.target.value)}
-                onBlur={handleTitleBlur}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleTitleBlur();
-                }}
-                className="bg-transparent text-sm font-semibold tracking-tight text-white border-b border-white/30 focus:outline-none pb-0.5"
-              />
-            ) : (
-              <h1
-                onClick={() => setIsEditingTitle(true)}
-                className="text-sm font-semibold tracking-tight text-zinc-100 hover:text-white cursor-pointer group flex items-center gap-2"
-                title="Click to rename routine"
-              >
-                <span>{titleText}</span>
-                <span className="opacity-0 group-hover:opacity-40 text-xs font-normal text-zinc-400">
-                  ✎
-                </span>
-              </h1>
-            )
-          ) : (
-            <div className="flex items-center gap-2.5">
-              <span className="text-sm font-semibold tracking-tight text-zinc-100">
-                {activeTab === 'assessment' && 'Continuous Assessment'}
-                {activeTab === 'courses' && 'Course Catalog & Semesters'}
-                {activeTab === 'analytics' && 'CGPA Trajectory & Analytics'}
-              </span>
-              <span className="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.06] text-[11px] font-mono tabular-nums text-zinc-400">
-                {deptShort} • {termShort}
-              </span>
-            </div>
-          )}
+      <aside className="w-56 shrink-0 h-full bg-[#111215] border-r border-white/[0.08] flex flex-col justify-between p-4 no-print select-none z-30">
+        <div>
+          {/* Top: App Title & Active Term */}
+          <div className="px-2 pt-1 pb-4 border-b border-white/[0.06]">
+            <h1 className="text-sm font-bold tracking-tight text-white flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              BUETTracker
+            </h1>
+            <p className="text-xs text-zinc-400 font-mono mt-1 tabular-nums">
+              {deptShort} • {termShort}
+            </p>
+          </div>
+
+          {/* Navigation List (vertical) */}
+          <nav className="mt-4 space-y-1">
+            {[
+              { id: 'routine', label: 'Routine', icon: Calendar },
+              { id: 'assessment', label: 'Assessment', icon: Calculator },
+              { id: 'courses', label: 'Courses', icon: BookOpen },
+              { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+            ].map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id as any)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-md transition-all duration-150 cursor-pointer ${
+                    isActive
+                      ? 'bg-white/[0.1] text-white font-medium shadow-xs'
+                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-zinc-400'}`} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
         </div>
 
-        {/* Center: Minimal Segmented View Switch */}
-        <nav className="flex items-center p-0.5 rounded-lg bg-zinc-900/90 border border-white/[0.06]">
-          {(['routine', 'assessment', 'courses', 'analytics'] as const).map((tab) => {
-            const isActive = activeTab === tab;
-            const label = tab.charAt(0).toUpperCase() + tab.slice(1);
-            return (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-3.5 py-1 rounded-md text-xs transition-colors duration-100 capitalize ${
-                  isActive
-                    ? 'bg-white/[0.08] text-zinc-100 font-medium shadow-xs'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Right: Subtle [ Export ▾ ] and small [ Load Sample ] ghost button */}
-        <div className="flex items-center gap-3 min-w-[280px] justify-end">
-          {activeTab === 'routine' && (
-            <>
-              {/* Load Sample Ghost Button */}
-              <button
-                onClick={handleLoadSampleRoutine}
-                className="text-xs text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] px-2.5 py-1.5 rounded-lg transition-colors"
-                title="Reset to BUET sample template"
-              >
-                Load Sample
-              </button>
-
-              {/* Subtle Export ▾ Dropdown Button */}
-              <div className="relative" ref={exportDropdownRef}>
-                <button
-                  onClick={() => setIsExportOpen(!isExportOpen)}
-                  disabled={isExporting}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-medium border border-white/[0.08] transition-colors shadow-xs"
-                >
-                  <span>{isExporting ? 'Exporting...' : 'Export'}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
-                </button>
-
-                {isExportOpen && (
-                  <div className="absolute right-0 top-full mt-1.5 w-40 rounded-xl bg-[#14151a] border border-white/[0.08] shadow-2xl p-1 z-50 text-xs">
-                    <button
-                      onClick={handleExportPNG}
-                      className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/[0.04] text-zinc-200 transition-colors flex items-center gap-2"
-                    >
-                      <Download className="w-3.5 h-3.5 text-zinc-400" />
-                      <span>Save as PNG</span>
-                    </button>
-                    <button
-                      onClick={handleExportPDF}
-                      className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/[0.04] text-zinc-200 transition-colors flex items-center gap-2"
-                    >
-                      <FileDown className="w-3.5 h-3.5 text-zinc-400" />
-                      <span>Save as PDF</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-
-          {/* Settings & Profile Quick Toggle */}
+        {/* Bottom: User profile preview + Settings cog */}
+        <div className="pt-3 border-t border-white/[0.06] flex items-center justify-between px-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-xs font-bold text-emerald-400 shrink-0">
+              {settings.studentName?.charAt(0) || 'A'}
+            </div>
+            <div className="min-w-0">
+              <span className="text-xs font-medium text-zinc-200 block truncate">
+                {settings.studentName?.split(' ')[0] || 'Ashfaque'}
+              </span>
+              <span className="text-[10px] font-mono text-zinc-500 block truncate tabular-nums">
+                {overallCgpa.gpa.toFixed(2)} CGPA
+              </span>
+            </div>
+          </div>
           <button
             onClick={() => setShowSettingsModal(true)}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.04] transition-colors"
+            className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors cursor-pointer"
             title="Settings & Data"
           >
             <Settings className="w-4 h-4" />
           </button>
         </div>
-      </header>
+      </aside>
 
-      {/* Floating Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 bg-zinc-900 border border-white/12 text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs font-medium animate-slide-up no-print">
-          <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      {/* ----------------------------------------------------------------- */}
+      {/* 2. Main Canvas (Right)                                            */}
+      {/* ----------------------------------------------------------------- */}
+      <main className="flex-1 h-full flex flex-col overflow-y-auto">
+        {/* Floating Toast Notification */}
+        {toastMessage && (
+          <div className="fixed bottom-5 right-5 z-50 bg-zinc-900 border border-white/12 text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs font-medium animate-slide-up no-print">
+            <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{toastMessage}</span>
+          </div>
+        )}
 
-      {/* Main Workspace: Expanded Hero Canvas */}
-      <main className="flex-1 w-full px-6 py-4 flex flex-col animate-fade-in">
-        {/* Tab 1: Routine Designer */}
+        {/* Tab 1: Routine Designer with Centered Timetable Canvas */}
         {activeTab === 'routine' && (
-          <RoutineDesigner
-            routine={routine}
-            courses={courses}
-            onUpdateRoutine={handleUpdateRoutine}
-            onLoadSampleRoutine={handleLoadSampleRoutine}
-          />
+          <div className="flex-1 flex flex-col justify-center items-center px-8 py-6 w-full min-h-full">
+            <div className="w-full max-w-[1380px] mx-auto flex flex-col justify-center space-y-3.5">
+              {/* Routine Header (Directly above centered table) */}
+              <div className="flex items-center justify-between gap-4 w-full">
+                {/* Left: Editable routine title */}
+                <div>
+                  {isEditingTitle ? (
+                    <input
+                      type="text"
+                      autoFocus
+                      value={titleText}
+                      onChange={(e) => setTitleText(e.target.value)}
+                      onBlur={handleTitleBlur}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleTitleBlur();
+                      }}
+                      className="bg-transparent text-lg font-bold tracking-tight text-white border-b border-emerald-500/60 focus:outline-none pb-0.5"
+                    />
+                  ) : (
+                    <h2
+                      onClick={() => setIsEditingTitle(true)}
+                      className="text-lg font-bold tracking-tight text-white hover:text-zinc-200 cursor-pointer group flex items-center gap-2"
+                      title="Click to rename routine"
+                    >
+                      <span>{titleText}</span>
+                      <span className="opacity-0 group-hover:opacity-40 text-xs font-normal text-zinc-400">
+                        ✎
+                      </span>
+                    </h2>
+                  )}
+                </div>
+
+                {/* Right: Action Buttons with cursor-pointer */}
+                <div className="flex items-center gap-2.5">
+                  <button
+                    onClick={handleLoadSampleRoutine}
+                    className="text-xs text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                    title="Reset to BUET sample template"
+                  >
+                    Load Sample
+                  </button>
+
+                  <div className="relative" ref={exportDropdownRef}>
+                    <button
+                      onClick={() => setIsExportOpen(!isExportOpen)}
+                      disabled={isExporting}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-medium border border-white/[0.08] transition-colors shadow-xs cursor-pointer"
+                    >
+                      <span>{isExporting ? 'Exporting...' : 'Export'}</span>
+                      <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+                    </button>
+
+                    {isExportOpen && (
+                      <div className="absolute right-0 top-full mt-1.5 w-40 rounded-xl bg-[#14151a] border border-white/[0.08] shadow-2xl p-1 z-50 text-xs">
+                        <button
+                          onClick={handleExportPNG}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] text-zinc-200 transition-colors flex items-center gap-2 cursor-pointer"
+                        >
+                          <Download className="w-3.5 h-3.5 text-zinc-400" />
+                          <span>Save as PNG</span>
+                        </button>
+                        <button
+                          onClick={handleExportPDF}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] text-zinc-200 transition-colors flex items-center gap-2 cursor-pointer"
+                        >
+                          <FileDown className="w-3.5 h-3.5 text-zinc-400" />
+                          <span>Save as PDF</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* The Timetable Grid */}
+              <RoutineDesigner
+                routine={routine}
+                courses={courses}
+                onUpdateRoutine={handleUpdateRoutine}
+              />
+            </div>
+          </div>
         )}
 
         {/* Tab 2: Assessment Engine */}
         {activeTab === 'assessment' && (
-          <div className="max-w-7xl w-full mx-auto">
+          <div className="p-8 w-full max-w-[1380px] mx-auto animate-fade-in">
             <OrdinanceEngine
               courses={courses}
               onUpdateCourse={handleUpdateCourse}
@@ -549,7 +577,7 @@ export function App() {
 
         {/* Tab 3: Courses Manager */}
         {activeTab === 'courses' && (
-          <div className="max-w-7xl w-full mx-auto">
+          <div className="p-8 w-full max-w-[1380px] mx-auto animate-fade-in">
             <CourseManager
               courses={courses}
               activeSemesterId={settings.currentSemesterId}
@@ -564,7 +592,7 @@ export function App() {
 
         {/* Tab 4: Analytics Dashboard */}
         {activeTab === 'analytics' && (
-          <div className="max-w-7xl w-full mx-auto">
+          <div className="p-8 w-full max-w-[1380px] mx-auto animate-fade-in">
             <AnalyticsDashboard
               courses={courses}
               settings={settings}

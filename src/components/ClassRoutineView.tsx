@@ -626,17 +626,19 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
               {/* Header Row: Periods 1 to 6, BREAK, Period 7 (Lab) */}
               <thead>
                 <tr className="border-b border-white/[0.06] bg-[#0d0e11]">
-                  <th className="w-16 p-3 text-xs font-mono font-semibold text-zinc-400 uppercase tracking-wider text-center border-r border-white/[0.06]">
-                    Day
+                  <th className="w-16 p-2.5 text-center border-r border-white/[0.06]">
+                    <span className="text-xs font-mono font-semibold text-zinc-400 uppercase tracking-wider block">
+                      Day
+                    </span>
                   </th>
                   {[1, 2, 3, 4, 5, 6].map((pId) => {
                     const p = PERIODS.find((item) => item.id === pId)!;
                     return (
                       <th
                         key={p.id}
-                        className="p-3 border-r border-white/[0.06] w-[11.8%]"
+                        className="p-2.5 border-r border-white/[0.06] w-[12%] text-center"
                       >
-                        <div className="flex flex-col">
+                        <div className="flex flex-col items-center justify-center text-center">
                           <span className="text-xs font-semibold text-zinc-200">
                             {p.name}
                           </span>
@@ -647,8 +649,8 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
                       </th>
                     );
                   })}
-                  <th className="w-14 p-2 text-center border-r border-white/[0.06] bg-zinc-950/30">
-                    <div className="flex flex-col items-center">
+                  <th className="w-14 p-2 text-center border-r border-white/[0.06] bg-zinc-950/40">
+                    <div className="flex flex-col items-center justify-center text-center">
                       <span className="text-[10px] font-mono tracking-widest text-amber-500/80 font-bold block">
                         RECESS
                       </span>
@@ -657,10 +659,10 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
                       </span>
                     </div>
                   </th>
-                  <th className="p-3 w-56">
-                    <div className="flex flex-col">
+                  <th className="p-2.5 w-52 text-center">
+                    <div className="flex flex-col items-center justify-center text-center">
                       <span className="text-xs font-semibold text-zinc-200">
-                        Period 7 (Lab Block)
+                        Period 7 (Lab)
                       </span>
                       <span className="text-[11px] font-mono tabular-nums text-zinc-400 mt-0.5">
                         2:30 - 5:00
@@ -678,7 +680,7 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
                   return (
                     <tr key={day} className="h-28">
                       {/* Day Label Cell */}
-                      <td className="w-16 p-3 text-center bg-[#0d0e11] select-none border-r border-white/[0.06] align-middle">
+                      <td className="w-16 p-2.5 text-center bg-[#0d0e11] select-none border-r border-white/[0.06] align-middle">
                         <span className="text-sm font-bold font-mono tracking-wider text-zinc-200 block uppercase">
                           {day.slice(0, 3)}
                         </span>
@@ -706,51 +708,39 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
                             key={pId}
                             colSpan={span}
                             onClick={() => handleCellClick(day, pId)}
-                            className={`p-2 border-r border-white/[0.06] transition-colors relative group align-top ${
+                            className={`p-1.5 border-r border-white/[0.06] transition-colors align-middle cursor-pointer ${
                               slot
-                                ? 'bg-zinc-900/30 hover:bg-zinc-800/40 cursor-pointer'
-                                : 'hover:bg-white/[0.02] cursor-pointer'
+                                ? 'bg-zinc-900/30 hover:bg-zinc-800/40'
+                                : 'hover:bg-white/[0.02]'
                             }`}
                           >
                             {slot ? (
                               <div
-                                className={`h-full min-h-[96px] rounded-xl p-3 flex flex-col justify-between border bg-zinc-900/90 hover:border-white/[0.14] transition-all relative ${
+                                className={`h-full min-h-[96px] rounded-xl border bg-zinc-900/90 hover:border-white/[0.14] transition-all flex flex-col items-center justify-center text-center p-2.5 cursor-pointer relative ${
                                   isSessional
                                     ? 'border-violet-500/30 border-l-[3px] border-l-violet-400'
                                     : 'border-white/[0.06]'
                                 }`}
                               >
-                                {/* Line 1: Course Code & Optional Sessional/Lab tag (NO green theory badge!) */}
-                                <div className="flex items-center justify-between gap-1.5">
-                                  <span className="text-sm font-bold font-mono tracking-tight text-white">
-                                    {slot.code}
-                                  </span>
-                                  {isSessional && (
-                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-violet-500/15 text-violet-300 border border-violet-500/20">
-                                      Lab
-                                    </span>
-                                  )}
-                                </div>
+                                {/* Line 1: Course Code */}
+                                <span className="text-sm font-semibold tracking-tight text-white block">
+                                  {slot.code}
+                                </span>
 
                                 {/* Line 2: Course Nickname */}
-                                <div className="text-xs text-zinc-300 font-medium leading-snug mt-1 break-words">
+                                <span className="text-xs font-medium text-zinc-300 mt-0.5 block truncate max-w-full">
                                   {slot.nickname}
-                                </div>
+                                </span>
 
                                 {/* Line 3: Instructor & Room Tag */}
-                                <div className="text-xs text-zinc-400 font-mono flex flex-wrap items-center gap-1.5 pt-1.5 mt-auto">
-                                  <span>{slot.teacher || 'TBA'}</span>
-                                  {slot.room && (
-                                    <>
-                                      <span className="text-zinc-600">•</span>
-                                      <span className="text-zinc-400">{slot.room}</span>
-                                    </>
-                                  )}
-                                </div>
+                                <span className="text-[11px] font-mono text-zinc-400 mt-1 block truncate max-w-full">
+                                  {slot.teacher || 'TBA'}
+                                  {slot.room && ` • ${slot.room.replace(/^Room:\s*/i, '')}`}
+                                </span>
                               </div>
                             ) : (
-                              /* Empty Cell: Quiet hover with faint '+' icon */
-                              <div className="h-full min-h-[96px] flex items-center justify-center">
+                              /* Empty Cell: Hairline outline */
+                              <div className="h-full min-h-[96px] rounded-xl border border-white/[0.05] hover:border-white/[0.12] hover:bg-white/[0.02] flex items-center justify-center transition-all cursor-pointer group">
                                 <Plus className="w-4 h-4 text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
                               </div>
                             )}
@@ -781,37 +771,27 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
                         return (
                           <td
                             onClick={() => handleCellClick(day, 7)}
-                            className={`p-2 transition-colors relative group align-top ${
+                            className={`p-1.5 transition-colors align-middle cursor-pointer ${
                               slot
-                                ? 'bg-zinc-900/30 hover:bg-zinc-800/40 cursor-pointer'
-                                : 'hover:bg-white/[0.02] cursor-pointer'
+                                ? 'bg-zinc-900/30 hover:bg-zinc-800/40'
+                                : 'hover:bg-white/[0.02]'
                             }`}
                           >
                             {slot ? (
-                              <div className="h-full min-h-[96px] rounded-xl p-3 flex flex-col justify-between border border-violet-500/30 border-l-[3px] border-l-violet-400 bg-zinc-900/90 hover:border-white/[0.14] transition-all">
-                                <div className="flex items-center justify-between gap-1.5">
-                                  <span className="text-sm font-bold font-mono tracking-tight text-white">
-                                    {slot.code}
-                                  </span>
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-violet-500/15 text-violet-300 border border-violet-500/20">
-                                    Lab Block
-                                  </span>
-                                </div>
-                                <div className="text-xs text-zinc-300 font-medium leading-snug mt-1 break-words">
+                              <div className="h-full min-h-[96px] rounded-xl border border-violet-500/30 border-l-[3px] border-l-violet-400 bg-zinc-900/90 hover:border-white/[0.14] transition-all flex flex-col items-center justify-center text-center p-2.5 cursor-pointer relative">
+                                <span className="text-sm font-semibold tracking-tight text-white block">
+                                  {slot.code}
+                                </span>
+                                <span className="text-xs font-medium text-zinc-300 mt-0.5 block truncate max-w-full">
                                   {slot.nickname}
-                                </div>
-                                <div className="text-xs text-zinc-400 font-mono flex flex-wrap items-center gap-1.5 pt-1.5 mt-auto">
-                                  <span>{slot.teacher || 'Lab Instructors'}</span>
-                                  {slot.room && (
-                                    <>
-                                      <span className="text-zinc-600">•</span>
-                                      <span className="text-zinc-400">{slot.room}</span>
-                                    </>
-                                  )}
-                                </div>
+                                </span>
+                                <span className="text-[11px] font-mono text-zinc-400 mt-1 block truncate max-w-full">
+                                  {slot.teacher || 'Lab Instructors'}
+                                  {slot.room && ` • ${slot.room.replace(/^Room:\s*/i, '')}`}
+                                </span>
                               </div>
                             ) : (
-                              <div className="h-full min-h-[96px] flex items-center justify-center">
+                              <div className="h-full min-h-[96px] rounded-xl border border-white/[0.05] hover:border-white/[0.12] hover:bg-white/[0.02] flex items-center justify-center transition-all cursor-pointer group">
                                 <Plus className="w-4 h-4 text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
                               </div>
                             )}
