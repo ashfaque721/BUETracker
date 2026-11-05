@@ -72,14 +72,21 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
   const [parseResult, setParseResult] = useState<BIISParseResult | null>(null);
   const [uploadedImagePreview, setUploadedImagePreview] = useState<string | null>(null);
 
-  const activeSemester = BUET_SEMESTERS.find((s) => s.id === activeSemesterId) || BUET_SEMESTERS[2];
-  const semesterCourses = courses.filter((c) => c.semesterId === activeSemesterId);
-  const isOngoingSemester = activeSemester.isCurrent;
+  // Independent Viewed Semester state for browsing past & future terms without disrupting active routine
+  const [viewedSemesterId, setViewedSemesterId] = useState<string>(activeSemesterId);
+
+  React.useEffect(() => {
+    setViewedSemesterId(activeSemesterId);
+  }, [activeSemesterId]);
+
+  const activeSemester = BUET_SEMESTERS.find((s) => s.id === viewedSemesterId) || BUET_SEMESTERS[2];
+  const semesterCourses = courses.filter((c) => c.semesterId === viewedSemesterId);
+  const isOngoingSemester = viewedSemesterId === activeSemesterId;
 
   const semesterGpa = calculateGPA(
     semesterCourses.map((c) => ({
       credits: c.credits,
-      gradePoint: c.isOngoing ? c.projectedGradePoint ?? 4.0 : c.gradePoint,
+      gradePoint: c.isOngoing ? c.projectedGradePoint ?? 4.0 : (c.gradePoint ?? 4.0),
     }))
   );
 
@@ -94,7 +101,7 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
       nickname: newNickname.trim() || newCode.trim(),
       credits: Number(newCredits),
       type: newType,
-      semesterId: activeSemesterId,
+      semesterId: viewedSemesterId,
       teacher: newTeacher.trim() || undefined,
       room: newRoom.trim() || undefined,
       color: newColor,
@@ -125,14 +132,14 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
 
   const handleImportScannedCourses = (scannedCourses: ParsedBIISCourse[]) => {
     const appCourses = scannedCourses.map((parsed) =>
-      convertParsedCourseToAppCourse(parsed, activeSemesterId, isOngoingSemester)
+      convertParsedCourseToAppCourse(parsed, viewedSemesterId, isOngoingSemester)
     );
     onBulkAddCourses(appCourses);
     setActiveTab('manual');
   };
 
   const handlePopulateCurriculum = () => {
-    const curriculumCourses = getIpeCoursesForSemester(activeSemesterId, isOngoingSemester);
+    const curriculumCourses = getIpeCoursesForSemester(viewedSemesterId, isOngoingSemester);
     const existingCodes = new Set(semesterCourses.map((c) => c.code));
     const toAdd = curriculumCourses.filter((c) => !existingCodes.has(c.code));
     if (toAdd.length > 0) {
@@ -177,21 +184,22 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
       <div className="flex items-center justify-between gap-3 p-2.5 surface-card">
         <div className="flex gap-1.5 overflow-x-auto pb-0.5">
           {BUET_SEMESTERS.map((sem) => {
-            const isSelected = sem.id === activeSemesterId;
+            const isSelected = sem.id === viewedSemesterId;
+            const isCurrentActive = sem.id === activeSemesterId;
             const semCourses = courses.filter((c) => c.semesterId === sem.id);
             return (
               <button
                 key={sem.id}
-                onClick={() => onSelectSemester(sem.id)}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap btn-tactile ${
+                onClick={() => setViewedSemesterId(sem.id)}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap btn-tactile cursor-pointer ${
                   isSelected
                     ? 'bg-zinc-800 text-zinc-100 shadow-xs border border-white/10'
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40 border border-transparent'
                 }`}
               >
                 <span>{sem.shortLabel}</span>
-                {sem.isCurrent && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                {isCurrentActive && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Current Active Routine Semester" />
                 )}
                 {semCourses.length > 0 && (
                   <span className="text-xs text-zinc-400 tabular-nums">({semCourses.length})</span>
@@ -201,13 +209,26 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
           })}
         </div>
 
-        {/* Term Metrics Capsule */}
-        <div className="hidden sm:flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-zinc-900 border border-white/[0.08] text-xs tabular-nums">
-          <span className="text-zinc-200 font-semibold font-sans">{activeSemester.label}</span>
-          <span className="text-zinc-600">•</span>
-          <span className="text-zinc-400">{semesterGpa.totalCredits} Credits</span>
-          <span className="text-zinc-600">•</span>
-          <span className="text-emerald-400 font-bold">{semesterGpa.gpa.toFixed(2)} GPA</span>
+        {/* Term Metrics Capsule & Set Active Routine Button */}
+        <div className="flex items-center gap-2.5">
+          {viewedSemesterId !== activeSemesterId && (
+            <button
+              onClick={() => onSelectSemester(viewedSemesterId)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition cursor-pointer"
+              title={`Switch active routine and tracking to ${activeSemester.shortLabel}`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Set as Active Term</span>
+            </button>
+          )}
+
+          <div className="hidden sm:flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-zinc-900 border border-white/[0.08] text-xs tabular-nums">
+            <span className="text-zinc-200 font-semibold font-sans">{activeSemester.label}</span>
+            <span className="text-zinc-600">•</span>
+            <span className="text-zinc-400">{semesterGpa.totalCredits} Credits</span>
+            <span className="text-zinc-600">•</span>
+            <span className="text-emerald-400 font-bold">{semesterGpa.gpa.toFixed(2)} GPA</span>
+          </div>
         </div>
       </div>
 
@@ -473,12 +494,23 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
                             Ongoing Term
                           </span>
                         ) : (
-                          <div className="tabular-nums">
-                            <span className="font-bold text-zinc-100 text-xs">{c.grade || '—'}</span>
-                            <span className="text-zinc-400 text-xs ml-1">
-                              ({(c.gradePoint ?? 0).toFixed(2)})
-                            </span>
-                          </div>
+                          <select
+                            value={c.grade || 'A+'}
+                            onChange={(e) => {
+                              const match = BUET_GRADE_SCALE.find((g) => g.grade === e.target.value);
+                              if (match) {
+                                onUpdateCourse({ ...c, grade: match.grade, gradePoint: match.gradePoint });
+                              }
+                            }}
+                            className="bg-[#1b1d24] border border-white/[0.12] rounded-lg px-2 py-1 text-xs font-semibold text-zinc-100 cursor-pointer tabular-nums"
+                            title="Click to adjust completed grade"
+                          >
+                            {BUET_GRADE_SCALE.map((g) => (
+                              <option key={g.grade} value={g.grade} className="bg-[#14151a]">
+                                {g.grade} ({g.gradePoint.toFixed(2)})
+                              </option>
+                            ))}
+                          </select>
                         )}
                       </td>
 

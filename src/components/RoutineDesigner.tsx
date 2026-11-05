@@ -221,8 +221,10 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
         span,
         type,
       });
-    } else if (onUpdateRoutine && routine) {
-      let updatedSlots = [...routine.slots];
+    }
+
+    if (onUpdateRoutine && routine) {
+      let updatedSlots = [...(routine.slots || [])];
       if (editingCell.existingSlot) {
         updatedSlots = updatedSlots.filter((s) => s.id !== editingCell.existingSlot!.id);
       }
@@ -254,8 +256,14 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
 
     if (store) {
       store.removeRoutineSlot(editingCell.day, editingCell.periodId);
-    } else if (editingCell.existingSlot && onUpdateRoutine && routine) {
-      const updatedSlots = routine.slots.filter((s) => s.id !== editingCell.existingSlot!.id);
+    }
+
+    if (onUpdateRoutine && routine) {
+      const updatedSlots = (routine.slots || []).filter((s) => {
+        if (editingCell.existingSlot && s.id === editingCell.existingSlot.id) return false;
+        if (s.day === editingCell.day && s.periodId === editingCell.periodId) return false;
+        return true;
+      });
       onUpdateRoutine({
         ...routine,
         slots: updatedSlots,

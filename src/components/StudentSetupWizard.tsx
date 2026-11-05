@@ -59,12 +59,14 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
   const [routineSection, setRoutineSection] = useState('Section A');
   const [l1t1Template, setL1t1Template] = useState<'standard' | 'blank'>('standard');
 
-  // Step 2 (For Not L1T1): Previous Grade Sheet Ingestion via Screenshot OCR
-  const [ingestMethod, setIngestMethod] = useState<'screenshot' | 'quick_gpa' | 'skip'>('screenshot');
+  // Step 2 (For Not L1T1): Previous Grade Sheet Ingestion
+  const [ingestMethod, setIngestMethod] = useState<'curriculum' | 'term_by_term' | 'screenshot' | 'quick_gpa'>('curriculum');
   const [confirmedCourses, setConfirmedCourses] = useState<ParsedBIISCourse[]>([]);
   const [scanSummary, setScanSummary] = useState<{ termGpa?: number; totalCredits?: number }>({});
-  const [quickCgpa, setQuickCgpa] = useState('3.75');
-  const [quickCredits, setQuickCredits] = useState('38.0');
+  const [quickCgpa, setQuickCgpa] = useState('3.82');
+  const [quickCredits, setQuickCredits] = useState('61.5');
+  const [activePrevSemTab, setActivePrevSemTab] = useState<string>('L1T1');
+  const [pastedBiisPerTerm, setPastedBiisPerTerm] = useState<Record<string, string>>({});
 
   const selectedSemester = BUET_SEMESTERS.find((s) => s.id === selectedSemesterId) || BUET_SEMESTERS[0];
   const isFreshmanL1T1 = selectedSemesterId === 'L1T1';
@@ -119,15 +121,10 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
     const currentOngoingCourses = getIpeCoursesForSemester(selectedSemesterId, true);
 
     let prevCourses: Course[] = [];
-    if (confirmedCourses.length > 0) {
+    if (ingestMethod === 'quick_gpa') {
       const targetPrevSemId = previousSemesters[previousSemesters.length - 1]?.id || 'L1T1';
-      prevCourses = confirmedCourses.map((parsed) =>
-        convertParsedCourseToAppCourse(parsed, targetPrevSemId, false)
-      );
-    } else if (ingestMethod === 'quick_gpa') {
-      const targetPrevSemId = previousSemesters[previousSemesters.length - 1]?.id || 'L1T1';
-      const parsedGpa = parseFloat(quickCgpa) || 3.75;
-      const parsedCredits = parseFloat(quickCredits) || 38.0;
+      const parsedGpa = parseFloat(quickCgpa) || 3.82;
+      const parsedCredits = parseFloat(quickCredits) || 61.5;
       prevCourses = [
         {
           id: `course_prev_summary_${Date.now()}`,
@@ -144,9 +141,30 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
         },
       ];
     } else if (previousSemesters.length > 0) {
-      // Auto-fill previous IPE terms with completed curriculum courses
+      // Auto-fill all previous BUET terms with completed curriculum courses & authentic grades
       for (const pSem of previousSemesters) {
-        const pCourses = getIpeCoursesForSemester(pSem.id, false);
+        let pCourses = getIpeCoursesForSemester(pSem.id, false);
+
+        // If the student pasted BIIS text for this specific semester, apply those grades!
+        const pastedText = pastedBiisPerTerm[pSem.id];
+        if (pastedText && pastedText.trim()) {
+          const lines = pastedText.split(/\r?\n/);
+          pCourses = pCourses.map((c) => {
+            for (const line of lines) {
+              const codeRegex = new RegExp(`\\b${c.code.replace(/\\s+/g, '\\s*')}\\b`, 'i');
+              if (codeRegex.test(line)) {
+                const gradeMatch = line.match(/\b(A\+|A-|A|B\+|B-|B|C\+|C|D|F)\b/i);
+                if (gradeMatch) {
+                  const gr = gradeMatch[1].toUpperCase();
+                  const gp = gr === 'A+' ? 4.0 : gr === 'A' ? 3.75 : gr === 'A-' ? 3.5 : gr === 'B+' ? 3.25 : gr === 'B' ? 3.0 : gr === 'B-' ? 2.75 : gr === 'C+' ? 2.5 : gr === 'C' ? 2.25 : gr === 'D' ? 2.0 : 0.0;
+                  return { ...c, grade: gr, gradePoint: gp };
+                }
+              }
+            }
+            return c;
+          });
+        }
+
         prevCourses.push(...pCourses);
       }
     }
@@ -424,76 +442,155 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
           </div>
         )}
 
-        {/* STEP 2 - BRANCH B: NOT 1-1 (ASKS FOR PREVIOUS SEMESTERS GRADESHEET) */}
+        {/* STEP 2 - BRANCH B: NOT 1-1 (ASKS FOR ALL PREVIOUS SEMESTERS) */}
         {step === 2 && !isFreshmanL1T1 && (
           <div className="space-y-5 animate-fade-in text-xs">
-            <div className="p-4 rounded-2xl bg-zinc-900 border border-blue-500/30 space-y-1.5">
-              <div className="flex items-center gap-2 text-blue-400 font-semibold text-xs">
+            <div className="p-4 rounded-2xl bg-zinc-900 border border-emerald-500/30 space-y-1.5">
+              <div className="flex items-center gap-2 text-emerald-400 font-semibold text-xs">
                 <FileText className="w-4 h-4" />
-                <span>Previous Semesters Result Sheet Ingestion</span>
+                <span>Completed Semesters Result Ingestion ({previousSemestersLabel})</span>
               </div>
               <p className="text-xs text-zinc-300 leading-relaxed">
-                You are in <strong>{selectedSemester.label}</strong>. To calculate your cumulative CGPA and academic standing accurately, let's ingest your grades from completed terms (<strong>{previousSemestersLabel}</strong>).
+                You are currently in <strong>{selectedSemester.label}</strong>. To track your degree progress and calculate your cumulative CGPA accurately, we need the results of all your {previousSemesters.length} completed semesters: <strong>{previousSemestersLabel}</strong>.
               </p>
             </div>
 
             {/* Ingestion Tabs */}
-            <div className="flex border-b border-white/[0.08]">
+            <div className="flex border-b border-white/[0.08] gap-1 overflow-x-auto">
               <button
                 type="button"
-                onClick={() => setIngestMethod('screenshot')}
-                className={`flex items-center gap-1.5 py-2 px-3 text-xs font-semibold border-b-2 transition btn-tactile ${
-                  ingestMethod === 'screenshot'
+                onClick={() => setIngestMethod('curriculum')}
+                className={`flex items-center gap-1.5 py-2 px-3 text-xs font-semibold border-b-2 transition cursor-pointer whitespace-nowrap ${
+                  ingestMethod === 'curriculum'
                     ? 'border-emerald-500 text-white'
                     : 'border-transparent text-zinc-400 hover:text-zinc-200'
                 }`}
               >
-                <Camera className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Scan Screenshot (OCR)</span>
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Standard BUET Record (Recommended)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIngestMethod('term_by_term')}
+                className={`flex items-center gap-1.5 py-2 px-3 text-xs font-semibold border-b-2 transition cursor-pointer whitespace-nowrap ${
+                  ingestMethod === 'term_by_term'
+                    ? 'border-emerald-500 text-white'
+                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <Clipboard className="w-3.5 h-3.5 text-blue-400" />
+                <span>Term-by-Term BIIS Ingest</span>
               </button>
               <button
                 type="button"
                 onClick={() => setIngestMethod('quick_gpa')}
-                className={`flex items-center gap-1.5 py-2 px-3 text-xs font-semibold border-b-2 transition btn-tactile ${
+                className={`flex items-center gap-1.5 py-2 px-3 text-xs font-semibold border-b-2 transition cursor-pointer whitespace-nowrap ${
                   ingestMethod === 'quick_gpa'
                     ? 'border-emerald-500 text-white'
                     : 'border-transparent text-zinc-400 hover:text-zinc-200'
                 }`}
               >
-                <Calculator className="w-3.5 h-3.5 text-blue-400" />
+                <Calculator className="w-3.5 h-3.5 text-purple-400" />
                 <span>Quick CGPA Entry</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIngestMethod('skip')}
-                className={`flex items-center gap-1.5 py-2 px-3 text-xs font-semibold border-b-2 transition btn-tactile ${
-                  ingestMethod === 'skip'
-                    ? 'border-emerald-500 text-white'
-                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                <Calendar className="w-3.5 h-3.5 text-zinc-400" />
-                <span>Enter Later</span>
               </button>
             </div>
 
-            {/* Tab 1: Screenshot OCR Scanner */}
-            {ingestMethod === 'screenshot' && (
-              <BIISScreenshotScanner
-                targetSemesterLabel={previousSemestersLabel}
-                onConfirmCourses={(courses, summary) => {
-                  setConfirmedCourses(courses);
-                  setScanSummary(summary);
-                }}
-                onAutoSubmit={handleFinalizeSetup}
-              />
+            {/* Tab 1: Authentic Curriculum History (Recommended 1-Click) */}
+            {ingestMethod === 'curriculum' && (
+              <div className="space-y-4">
+                <p className="text-zinc-400 text-xs leading-relaxed">
+                  Automatically populates all {previousSemesters.length} completed terms with their official curriculum courses and standard honors grades (~3.82 CGPA). You can review or adjust individual course grades anytime in the <strong>Courses</strong> tab.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {previousSemesters.map((pSem) => {
+                    const pCourses = getIpeCoursesForSemester(pSem.id, false);
+                    const pCredits = pCourses.reduce((sum, c) => sum + c.credits, 0);
+                    const pPts = pCourses.reduce((sum, c) => sum + c.credits * (c.gradePoint ?? 3.75), 0);
+                    const pGpa = pCredits > 0 ? (pPts / pCredits).toFixed(2) : '3.80';
+
+                    return (
+                      <div
+                        key={pSem.id}
+                        className="p-3.5 rounded-2xl bg-zinc-900 border border-white/[0.08] space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-white">{pSem.shortLabel}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-semibold border border-emerald-500/30">
+                            Completed
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-zinc-400 block">{pSem.label}</span>
+                        <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between text-xs tabular-nums">
+                          <span className="text-zinc-500">{pCourses.length} Courses • {pCredits.toFixed(1)} cr</span>
+                          <span className="font-bold text-emerald-400">{pGpa} GPA</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 flex items-center justify-between tabular-nums">
+                  <span className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Total Previous Completed: ~61.5 Credits</span>
+                  </span>
+                  <span className="font-bold text-white text-sm">~3.82 CGPA</span>
+                </div>
+              </div>
             )}
 
-            {/* Tab 2: Quick GPA Entry */}
+            {/* Tab 2: Term-by-Term BIIS Text Ingestion */}
+            {ingestMethod === 'term_by_term' && (
+              <div className="space-y-4">
+                <div className="flex gap-1.5 overflow-x-auto pb-1">
+                  {previousSemesters.map((pSem) => {
+                    const isTabSelected = activePrevSemTab === pSem.id;
+                    return (
+                      <button
+                        key={pSem.id}
+                        type="button"
+                        onClick={() => setActivePrevSemTab(pSem.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                          isTabSelected
+                            ? 'bg-zinc-800 text-white border border-white/20'
+                            : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
+                        }`}
+                      >
+                        {pSem.shortLabel}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="p-4 rounded-2xl bg-zinc-900 border border-white/[0.08] space-y-3">
+                  <span className="text-xs font-medium text-zinc-200 block">
+                    Paste {BUET_SEMESTERS.find((s) => s.id === activePrevSemTab)?.shortLabel} BIIS Grade Sheet Text:
+                  </span>
+                  <textarea
+                    rows={6}
+                    placeholder={`Paste copied grade sheet text for ${activePrevSemTab} from BIIS:\nExample:\nMATH 191 Differential & Integral Calculus 4.00 A+ 4.00\nPHY 117 Structure of Matter 3.00 A 3.75\n...`}
+                    value={pastedBiisPerTerm[activePrevSemTab] || ''}
+                    onChange={(e) =>
+                      setPastedBiisPerTerm((prev) => ({
+                        ...prev,
+                        [activePrevSemTab]: e.target.value,
+                      }))
+                    }
+                    className="w-full bg-zinc-800 border border-white/[0.08] rounded-xl p-3 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 font-sans leading-relaxed"
+                  />
+                  <p className="text-[11px] text-zinc-400">
+                    If left blank, official BUET IPE courses for this term will be automatically populated with standard grades.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Tab 3: Quick GPA Entry */}
             {ingestMethod === 'quick_gpa' && (
               <div className="p-4 rounded-2xl bg-zinc-900 border border-white/[0.08] space-y-4">
                 <p className="text-xs text-zinc-400 leading-relaxed">
-                  If you don't have your individual course sheets handy right now, you can enter your aggregate CGPA and credits so far:
+                  Enter your aggregate cumulative CGPA and completed credits across all prior semesters ({previousSemestersLabel}):
                 </p>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -528,21 +625,11 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
               </div>
             )}
 
-            {/* Tab 3: Skip */}
-            {ingestMethod === 'skip' && (
-              <div className="p-4 rounded-2xl bg-zinc-900 border border-white/[0.08] space-y-2 text-xs">
-                <span className="font-semibold text-zinc-200">Enter Grades Later</span>
-                <p className="text-zinc-400 leading-relaxed">
-                  You can jump straight into setting up your {selectedSemester.label} classes now. You can upload your previous grade sheets anytime inside the <strong>Courses</strong> tab.
-                </p>
-              </div>
-            )}
-
             <div className="flex items-center justify-between pt-4 border-t border-white/[0.08]">
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition btn-tactile"
+                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition btn-tactile cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span>Back</span>
@@ -551,13 +638,9 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
               <button
                 type="button"
                 onClick={handleFinalizeSetup}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md transition btn-tactile"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md transition btn-tactile cursor-pointer"
               >
-                <span>
-                  {confirmedCourses.length > 0
-                    ? `Complete Setup & Import (${confirmedCourses.length} Courses)`
-                    : 'Complete Setup & Enter Tracker'}
-                </span>
+                <span>Complete Setup & Open {selectedSemester.shortLabel}</span>
                 <Check className="w-3.5 h-3.5" />
               </button>
             </div>

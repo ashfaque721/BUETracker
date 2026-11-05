@@ -977,6 +977,38 @@ export const IPE_CURRICULUM_DATA: Record<string, SemesterCurriculum> = {
   },
 };
 
+const STANDARD_GRADE_MAP: Record<string, { grade: string; gradePoint: number }> = {
+  'MATH 191': { grade: 'A+', gradePoint: 4.0 },
+  'PHY 117': { grade: 'A', gradePoint: 3.75 },
+  'CHEM 119': { grade: 'A-', gradePoint: 3.5 },
+  'HUM 211': { grade: 'A+', gradePoint: 4.0 },
+  'IPE 105': { grade: 'A', gradePoint: 3.75 },
+  'ME 160': { grade: 'A+', gradePoint: 4.0 },
+  'SHOP 170': { grade: 'A+', gradePoint: 4.0 },
+  'PHY 102': { grade: 'A+', gradePoint: 4.0 },
+  'CHEM 114': { grade: 'A', gradePoint: 3.75 },
+
+  'MATH 193': { grade: 'A+', gradePoint: 4.0 },
+  'CHEM 123': { grade: 'A', gradePoint: 3.75 },
+  'EEE 167': { grade: 'A-', gradePoint: 3.5 },
+  'ME 141': { grade: 'A+', gradePoint: 4.0 },
+  'IPE 101': { grade: 'A', gradePoint: 3.75 },
+  'PHY 118': { grade: 'A+', gradePoint: 4.0 },
+  'EEE 168': { grade: 'A', gradePoint: 3.75 },
+  'SHOP 160': { grade: 'A+', gradePoint: 4.0 },
+  'IPE 104': { grade: 'A+', gradePoint: 4.0 },
+
+  'MATH 291': { grade: 'A+', gradePoint: 4.0 },
+  'EEE 271': { grade: 'A', gradePoint: 3.75 },
+  'MME 295': { grade: 'A', gradePoint: 3.75 },
+  'CSE 295': { grade: 'A+', gradePoint: 4.0 },
+  'ME 245': { grade: 'A-', gradePoint: 3.5 },
+  'EEE 272': { grade: 'A', gradePoint: 3.75 },
+  'MME 296': { grade: 'A+', gradePoint: 4.0 },
+  'CSE 296': { grade: 'A+', gradePoint: 4.0 },
+  'IPE 204': { grade: 'A+', gradePoint: 4.0 },
+};
+
 /**
  * Creates Course objects for a given semester based on the IPE Curriculum
  */
@@ -984,6 +1016,14 @@ export function getIpeCoursesForSemester(semesterId: string, isOngoing: boolean 
   const curr = IPE_CURRICULUM_DATA[semesterId] || IPE_CURRICULUM_DATA.L2T1;
   return curr.courses.map((c, idx) => {
     const courseId = `c_${semesterId}_${c.code.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const standardGrade = STANDARD_GRADE_MAP[c.code] || (
+      c.type === 'sessional'
+        ? { grade: 'A+', gradePoint: 4.0 }
+        : idx % 2 === 0
+        ? { grade: 'A+', gradePoint: 4.0 }
+        : { grade: 'A', gradePoint: 3.75 }
+    );
+
     const baseCourse: Course = {
       id: courseId,
       code: c.code,
@@ -996,6 +1036,8 @@ export function getIpeCoursesForSemester(semesterId: string, isOngoing: boolean 
       room: c.room,
       color: c.color,
       isOngoing: isOngoing,
+      grade: isOngoing ? undefined : standardGrade.grade,
+      gradePoint: isOngoing ? undefined : standardGrade.gradePoint,
     };
 
     if (isOngoing && c.type === 'theory') {

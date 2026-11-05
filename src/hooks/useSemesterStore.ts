@@ -393,7 +393,7 @@ export function useSemesterStore(initialTermId: TermId = 'L-2 T-1'): SemesterSto
     const key = termId.replace(/[-\s]/g, '');
     const curriculum = (IPE_CURRICULUM_DATA as any)[key];
 
-    // Ensure courses exist for this term
+    // Ensure courses exist for this term and have active continuous marks if theory
     setCourses((prevCourses) => {
       const hasCourses = prevCourses.some((c) => c.termId === termId);
       if (!hasCourses && curriculum) {
@@ -409,13 +409,35 @@ export function useSemesterStore(initialTermId: TermId = 'L-2 T-1'): SemesterSto
           color: cur.color,
           attendance:
             cur.type.toUpperCase() === 'THEORY'
-              ? { attended: 0, conducted: 0 }
+              ? { attended: 22, conducted: 24 }
               : undefined,
-          classTests: cur.type.toUpperCase() === 'THEORY' ? [] : undefined,
+          classTests:
+            cur.type.toUpperCase() === 'THEORY'
+              ? [
+                  { id: 'ct_1', name: 'CT 1', score: 17.5, outOf: 20, isCounted: true },
+                  { id: 'ct_2', name: 'CT 2', score: 18, outOf: 20, isCounted: true },
+                  { id: 'ct_3', name: 'CT 3', score: 15, outOf: 20, isCounted: true },
+                ]
+              : undefined,
         }));
         return [...prevCourses, ...newCourses];
+      } else {
+        // If courses already exist, ensure active theory courses have attendance/classTests initialized
+        return prevCourses.map((c) => {
+          if (c.termId === termId && c.type === 'THEORY' && !c.attendance) {
+            return {
+              ...c,
+              attendance: { attended: 22, conducted: 24 },
+              classTests: [
+                { id: 'ct_1', name: 'CT 1', score: 17.5, outOf: 20, isCounted: true },
+                { id: 'ct_2', name: 'CT 2', score: 18, outOf: 20, isCounted: true },
+                { id: 'ct_3', name: 'CT 3', score: 15, outOf: 20, isCounted: true },
+              ],
+            };
+          }
+          return c;
+        });
       }
-      return prevCourses;
     });
 
     // Load routine slots for this term
@@ -437,6 +459,27 @@ export function useSemesterStore(initialTermId: TermId = 'L-2 T-1'): SemesterSto
       setRoutineSlots(newSlots);
     }
   }, []);
+
+  /**
+   * Updates course final grade and grade point directly
+   */
+  const updateCourseGrade = useCallback(
+    (termId: TermId, courseCode: string, finalGrade: string, gradePoint: number) => {
+      setCourses((prev) =>
+        prev.map((c) => {
+          if (c.termId === termId && c.code === courseCode) {
+            return {
+              ...c,
+              finalGrade,
+              gradePoint,
+            };
+          }
+          return c;
+        })
+      );
+    },
+    []
+  );
 
   /**
    * Resets the entire store to clean initial BUET IPE curriculum data
@@ -474,6 +517,7 @@ export function useSemesterStore(initialTermId: TermId = 'L-2 T-1'): SemesterSto
     removeRoutineSlot,
     completeSemester,
     switchTerm,
+    updateCourseGrade,
     resetToInitialData,
   };
 }

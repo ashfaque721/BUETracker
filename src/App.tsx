@@ -44,6 +44,12 @@ import jsPDF from 'jspdf';
 import { useSemesterStore } from './hooks/useSemesterStore';
 import { CompleteSemesterDialog } from './components/CompleteSemesterDialog';
 import { CompleteSemesterResult, TermId } from './types/semester';
+import {
+  storeCourseToAppCourse,
+  appCourseToStoreCourse,
+  termIdToSemId,
+  semIdToTermId,
+} from './utils/courseBridge';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'routine' | 'assessment' | 'courses' | 'analytics'>('routine');
@@ -67,13 +73,24 @@ export function App() {
   // Unified BUET Semester Store
   const store = useSemesterStore('L-2 T-2');
 
-  const handleSemesterCompleted = (result: CompleteSemesterResult) => {
+  // Bridge store courses to legacy App courses for CourseManager & Analytics
+  const appCourses = React.useMemo(() => {
+    return store.courses.map((c) => storeCourseToAppCourse(c, store.currentTermId));
+  }, [store.courses, store.currentTermId]);
+
+  const handleSemesterCompleted = async (result: CompleteSemesterResult) => {
     showToast(
       `🎉 Completed ${result.completedTermId} (GPA ${result.termGPA.toFixed(2)})! Advanced to ${result.nextTermId || 'Graduation'}`
     );
     if (result.nextTermId) {
-      const nextSemKey = result.nextTermId.replace(/[-\s]/g, '');
-      setSettings((prev) => ({ ...prev, currentSemesterId: nextSemKey }));
+      const nextSemKey = termIdToSemId(result.nextTermId);
+      const updatedSettings = { ...settings, currentSemesterId: nextSemKey };
+      const nextRoutine = getIpeRoutineForSemester(nextSemKey);
+      setSettings(updatedSettings);
+      setRoutine(nextRoutine);
+      setTitleText(nextRoutine.title);
+      await db.settings.put({ id: 'primary_settings', ...updatedSettings });
+      await db.routines.put(nextRoutine);
     }
   };
 
@@ -181,6 +198,7 @@ export function App() {
       if (allSettings.length > 0 && allSettings[0].isOnboarded) {
         const userSet = allSettings[0];
         const currentSemId = userSet.currentSemesterId || 'L2T1';
+        const currentTerm = semIdToTermId(currentSemId);
         let loadedCourses = allCourses;
         let loadedRoutine = allRoutines[0];
 
@@ -203,6 +221,30 @@ export function App() {
         setRoutine(loadedRoutine);
         if (loadedRoutine.title) {
           setTitleText(loadedRoutine.title);
+        }
+
+        // Synchronize store with loaded DB data
+        if (loadedCourses.length > 0) {
+          store.setCourses(loadedCourses.map(appCourseToStoreCourse));
+        }
+        store.switchTerm(currentTerm);
+
+        if (loadedRoutine && loadedRoutine.slots && loadedRoutine.slots.length > 0) {
+          const storeSlots = loadedRoutine.slots.map((s) => ({
+            id: s.id,
+            day: s.day,
+            periodIndex: s.periodId,
+            courseCode: s.customCode || '',
+            details: {
+              title: s.customNickname || s.customCode,
+              nickname: s.customNickname,
+              teacher: s.customTeacher,
+              room: s.customRoom,
+              span: s.span || 1,
+              type: (s.periodId === 7 || (s.span && s.span > 1) ? 'SESSIONAL' : 'THEORY') as any,
+            },
+          }));
+          store.setRoutineSlots(storeSlots);
         }
       } else {
         // First run: Show onboarding wizard
@@ -232,11 +274,10 @@ export function App() {
   // Semester Switcher Handler: switches active semester, ensures authentic IPE courses & routine exist
   const handleSwitchSemester = async (newSemId: string) => {
     try {
-      const semCurriculum = IPE_CURRICULUM_DATA[newSemId] || IPE_CURRICULUM_DATA.L2T1;
-      if (semCurriculum && semCurriculum.shortLabel) {
-        store.switchTerm(semCurriculum.shortLabel as TermId);
-      }
+      const targetTermId = semIdToTermId(newSemId);
+      store.switchTerm(targetTermId);
       const newRoutine = getIpeRoutineForSemester(newSemId);
+      const semCurriculum = IPE_CURRICULUM_DATA[newSemId] || IPE_CURRICULUM_DATA.L2T1;
 
       const existingSemCourses = courses.filter((c) => c.semesterId === newSemId);
       let updatedCourses = [...courses];
@@ -280,7 +321,7 @@ export function App() {
         setTitleText(newRoutine.title);
       }
 
-      showToast(`Switched to ${semCurriculum.label} (${semCurriculum.shortLabel}) with official IPE routine & courses`);
+      showToast(`Switched active term to ${semCurriculum.label} (${targetTermId}) with official routine & courses`);
     } catch (err) {
       console.error('Error switching semester:', err);
       showToast('Failed to switch semester');
@@ -308,6 +349,12 @@ export function App() {
     } catch (err) {
       console.error('Failed to commit setup to database:', err);
     } finally {
+      // Synchronize store
+      const storeCourses = initialCourses.map(appCourseToStoreCourse);
+      store.setCourses(storeCourses);
+      const targetTermId = semIdToTermId(newSettings.currentSemesterId || 'L1T1');
+      store.switchTerm(targetTermId);
+
       setSettings(newSettings);
       setCourses(initialCourses);
       setRoutine(initialRoutine);
@@ -326,6 +373,7 @@ export function App() {
   // Explicit demo sample load: loads authentic BUET IPE curriculum for the active semester
   const handleLoadSampleRoutine = async () => {
     const targetSemId = settings.currentSemesterId || 'L2T1';
+    const targetTermId = semIdToTermId(targetSemId);
     const semRoutine = getIpeRoutineForSemester(targetSemId);
     const semCourses = getIpeCoursesForSemester(targetSemId, true);
 
@@ -337,26 +385,40 @@ export function App() {
       await db.routines.put(semRoutine);
     });
 
-    setCourses((prev) => [...prev.filter((c) => c.semesterId !== targetSemId), ...semCourses]);
+    const updatedCourses = [...courses.filter((c) => c.semesterId !== targetSemId), ...semCourses];
+    setCourses(updatedCourses);
+    store.setCourses(updatedCourses.map(appCourseToStoreCourse));
+    store.switchTerm(targetTermId);
     setRoutine(semRoutine);
     if (semRoutine.title) setTitleText(semRoutine.title);
-    showToast(`Loaded authentic BUET IPE ${IPE_CURRICULUM_DATA[targetSemId]?.shortLabel || targetSemId} routine & courses`);
+    showToast(`Loaded authentic BUET IPE ${targetTermId} routine & courses`);
   };
 
   // CRUD Handlers for Courses
   const handleAddCourse = async (course: Course) => {
     await db.courses.add(course);
     setCourses((prev) => [...prev, course]);
+    const sc = appCourseToStoreCourse(course);
+    store.setCourses((prev) => [...prev.filter((c) => !(c.code === sc.code && c.termId === sc.termId)), sc]);
     showToast(`Added course ${course.code}`);
   };
 
   const handleUpdateCourse = async (course: Course) => {
     await db.courses.put(course);
     setCourses((prev) => prev.map((c) => (c.id === course.id ? course : c)));
+    const sc = appCourseToStoreCourse(course);
+    store.setCourses((prev) =>
+      prev.map((c) => (c.code === sc.code && c.termId === sc.termId ? sc : c))
+    );
   };
 
   const handleDeleteCourse = async (courseId: string) => {
     await db.courses.delete(courseId);
+    const target = courses.find((c) => c.id === courseId) || appCourses.find((c) => c.id === courseId);
+    if (target) {
+      const termId = semIdToTermId(target.semesterId);
+      store.setCourses((prev) => prev.filter((c) => !(c.code === target.code && c.termId === termId)));
+    }
     setCourses((prev) => prev.filter((c) => c.id !== courseId));
     showToast('Course deleted');
   };
@@ -364,6 +426,13 @@ export function App() {
   const handleBulkAddCourses = async (newCourses: Course[]) => {
     await db.courses.bulkAdd(newCourses);
     setCourses((prev) => [...prev, ...newCourses]);
+    const newStoreCourses = newCourses.map(appCourseToStoreCourse);
+    store.setCourses((prev) => {
+      const key = (c: { code: string; termId: string }) => `${c.termId}_${c.code}`;
+      const newMap = new Map(newStoreCourses.map((c) => [key(c), c]));
+      const retained = prev.filter((c) => !newMap.has(key(c)));
+      return [...retained, ...newStoreCourses];
+    });
     showToast(`Imported ${newCourses.length} courses`);
   };
 
@@ -471,7 +540,7 @@ export function App() {
               </label>
               <div className="relative">
                 <select
-                  value={settings.currentSemesterId}
+                  value={termIdToSemId(store.currentTermId)}
                   onChange={(e) => handleSwitchSemester(e.target.value)}
                   className="w-full bg-[#18191e] border border-white/[0.1] rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 font-medium focus:outline-none focus:border-emerald-500/60 cursor-pointer appearance-none pr-6 transition-colors"
                 >
@@ -655,8 +724,8 @@ export function App() {
               <RoutineDesigner
                 store={store}
                 routine={routine}
-                courses={courses}
-                currentSemesterId={settings.currentSemesterId}
+                courses={appCourses}
+                currentSemesterId={termIdToSemId(store.currentTermId)}
                 onUpdateRoutine={handleUpdateRoutine}
               />
             </div>
@@ -674,8 +743,8 @@ export function App() {
         {activeTab === 'courses' && (
           <div className="p-8 w-full max-w-[1380px] mx-auto animate-fade-in">
             <CourseManager
-              courses={courses}
-              activeSemesterId={settings.currentSemesterId}
+              courses={appCourses}
+              activeSemesterId={termIdToSemId(store.currentTermId)}
               onSelectSemester={handleSwitchSemester}
               onAddCourse={handleAddCourse}
               onUpdateCourse={handleUpdateCourse}
@@ -689,7 +758,7 @@ export function App() {
         {activeTab === 'analytics' && (
           <div className="p-8 w-full max-w-[1380px] mx-auto animate-fade-in">
             <AnalyticsDashboard
-              courses={courses}
+              courses={appCourses}
               settings={settings}
             />
           </div>

@@ -137,6 +137,7 @@ export interface SemesterStoreActions {
   removeRoutineSlot: (day: DayOfWeek | string, periodIndex: number) => void;
   completeSemester: (grades: SemesterGradeInput[]) => CompleteSemesterResult;
   switchTerm: (termId: TermId) => void;
+  updateCourseGrade: (termId: TermId, courseCode: string, finalGrade: string, gradePoint: number) => void;
   resetToInitialData: () => void;
 }
 
