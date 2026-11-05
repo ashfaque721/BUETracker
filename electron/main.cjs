@@ -98,10 +98,11 @@ function createWindow() {
 
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
-  } else if (fs.existsSync(distIndexPath)) {
-    mainWindow.loadFile(distIndexPath);
   } else {
-    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.loadFile(distIndexPath).catch((err) => {
+      console.error('Failed to load local index.html:', err);
+      mainWindow.loadURL('http://localhost:5173').catch(() => {});
+    });
   }
 
   mainWindow.on('closed', () => {

@@ -428,7 +428,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
 
                               {/* Line 2: Course Nickname */}
                               <div className="text-[11px] text-zinc-400 truncate mt-1">
-                                {slot.customNickname || slot.customCode}
+                                {(slot.customNickname || slot.customCode || '').replace(/^\(|\)$/g, '')}
                               </div>
 
                               {/* Line 3: Teacher • Room */}
@@ -437,7 +437,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                                 {slot.customRoom && (
                                   <>
                                     <span>•</span>
-                                    <span className="text-zinc-400">{slot.customRoom}</span>
+                                    <span className="text-zinc-400">{slot.customRoom.replace(/^Room:\s*/i, '')}</span>
                                   </>
                                 )}
                               </div>
@@ -484,14 +484,14 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                                 </span>
                               </div>
                               <div className="text-[11px] text-zinc-400 truncate mt-1">
-                                {slot.customNickname || slot.customCode}
+                                {(slot.customNickname || slot.customCode || '').replace(/^\(|\)$/g, '')}
                               </div>
                               <div className="text-[10px] text-zinc-400 font-mono flex items-center gap-1.5 truncate mt-2">
                                 <span>{slot.customTeacher || 'Lab Instructors'}</span>
                                 {slot.customRoom && (
                                   <>
                                     <span>•</span>
-                                    <span className="text-zinc-400">{slot.customRoom}</span>
+                                    <span className="text-zinc-400">{slot.customRoom.replace(/^Room:\s*/i, '')}</span>
                                   </>
                                 )}
                               </div>

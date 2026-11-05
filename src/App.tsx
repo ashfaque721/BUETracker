@@ -39,22 +39,16 @@ import {
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'routine' | 'assessment' | 'courses' | 'analytics'>('routine');
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [routine, setRoutine] = useState<RoutineMetadata>({
-    id: 'initial_routine',
-    title: 'Class Routine of Section A',
-    subTitle: 'Level-1 Term-1 | BUET',
-    effectiveDate: 'November 2026',
-    slots: [],
-  });
+  const [courses, setCourses] = useState<Course[]>(SEED_COURSES);
+  const [routine, setRoutine] = useState<RoutineMetadata>(SEED_ROUTINE);
   const [settings, setSettings] = useState<UserSettings>({
-    studentName: '',
-    studentId: '',
-    department: 'Industrial & Production Engineering (IPE)',
+    studentName: 'Ashfaque Amin Eshan',
+    studentId: '2308001',
+    department: "Industrial & Production Engineering (IPE '23)",
     totalDegreeCredits: 160,
-    currentSemesterId: 'L1T1',
+    currentSemesterId: 'L2T1',
     theme: 'dark',
-    isOnboarded: false,
+    isOnboarded: true,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -91,20 +85,34 @@ export function App() {
 
       if (allSettings.length > 0 && allSettings[0].isOnboarded) {
         setSettings(allSettings[0]);
-        if (allCourses.length > 0) setCourses(allCourses);
-        if (allRoutines.length > 0) setRoutine(allRoutines[0]);
+        if (allCourses.length > 0) {
+          setCourses(allCourses);
+        } else {
+          setCourses(SEED_COURSES);
+        }
+        if (allRoutines.length > 0 && allRoutines[0].slots && allRoutines[0].slots.length > 0) {
+          setRoutine(allRoutines[0]);
+        } else {
+          setRoutine(SEED_ROUTINE);
+        }
       } else {
-        // Not onboarded yet: do not inject dummy data!
-        setSettings({
-          studentName: '',
-          studentId: '',
-          department: 'Industrial & Production Engineering (IPE)',
+        // Preload authentic BUET IPE '23 Level-2 Term-1 mock data
+        const defaultSettings: UserSettings = {
+          studentName: 'Ashfaque Amin Eshan',
+          studentId: '2308001',
+          department: "Industrial & Production Engineering (IPE '23)",
           totalDegreeCredits: 160,
-          currentSemesterId: 'L1T1',
+          currentSemesterId: 'L2T1',
           theme: 'dark',
-          isOnboarded: false,
-        });
-        setCourses([]);
+          isOnboarded: true,
+        };
+        await db.settings.put({ id: 'primary_settings', ...defaultSettings });
+        await db.courses.bulkPut(SEED_COURSES);
+        await db.routines.put(SEED_ROUTINE);
+
+        setSettings(defaultSettings);
+        setCourses(SEED_COURSES);
+        setRoutine(SEED_ROUTINE);
       }
     } catch (err) {
       console.error('Failed to load DB:', err);
