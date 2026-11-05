@@ -1,0 +1,280 @@
+import { useState, useMemo, useCallback } from 'react';
+import {
+  TermId,
+  Course,
+  RoutineSlot,
+  RoutineSlotDetails,
+  DayOfWeek,
+  ClassTest,
+  SemesterStore,
+} from '../types/semester';
+import {
+  INITIAL_BUET_COURSES,
+  INITIAL_ROUTINE_SLOTS,
+} from '../data/initialSemesterData';
+
+/**
+ * BUET Ordinance Best-n Class Test Recalculation Engine
+ * For N conducted CTs, counts the best n = max(1, N - 1) based on normalized percentage score.
+ */
+export function recalculateBestNClassTests(tests: ClassTest[]): ClassTest[] {
+  if (tests.length <= 1) {
+    return tests.map((t) => ({ ...t, isCounted: true }));
+  }
+
+  const bestCount = Math.max(1, tests.length - 1);
+
+  // Compute normalized score ratio for equitable ranking across varying maxMarks
+  const indexedRatios = tests.map((t, idx) => ({
+    idx,
+    ratio: t.outOf > 0 ? t.score / t.outOf : 0,
+    score: t.score,
+  }));
+
+  // Sort descending by ratio; tie-break by absolute score
+  indexedRatios.sort((a, b) => (b.ratio !== a.ratio ? b.ratio - a.ratio : b.score - a.score));
+
+  const countedIndices = new Set(indexedRatios.slice(0, bestCount).map((r) => r.idx));
+
+  return tests.map((t, idx) => ({
+    ...t,
+    isCounted: countedIndices.has(idx),
+  }));
+}
+
+/**
+ * Custom React State Hook & Data Layer for BUET Semester Isolation
+ *
+ * Eliminates the 39-course UI bug by strictly isolating semester data:
+ * - currentTermId defaults to 'L-2 T-1'
+ * - currentTheoryCourses: filtered strictly for (termId === currentTermId && type === 'THEORY')
+ * - currentTermCredits: isolated strictly to currentTermId (~18-20 cr, NOT 160 cr)
+ * - completedCredits & cumulativeCGPA: calculated strictly from completed terms (gradePoint !== undefined)
+ * - mutation handlers: addAttendance, addOrUpdateCT (best-n recalc), assignRoutineSlot
+ */
+export function useSemesterStore(initialTermId: TermId = 'L-2 T-1'): SemesterStore {
+  // 1. Core State
+  const [currentTermId, setCurrentTermId] = useState<TermId>(initialTermId);
+  const [courses, setCourses] = useState<Course[]>(INITIAL_BUET_COURSES);
+  const [routineSlots, setRoutineSlots] = useState<RoutineSlot[]>(INITIAL_ROUTINE_SLOTS);
+
+  // 2. Selectors / Filters (Strict Semester Isolation)
+
+  // Current semester all courses
+  const currentCourses = useMemo(() => {
+    return courses.filter((c) => c.termId === currentTermId);
+  }, [courses, currentTermId]);
+
+  // Current semester theory courses (continuous assessment CTs + Attendance)
+  const currentTheoryCourses = useMemo(() => {
+    return courses.filter((c) => c.termId === currentTermId && c.type === 'THEORY');
+  }, [courses, currentTermId]);
+
+  // Current semester sessional / lab courses
+  const currentSessionalCourses = useMemo(() => {
+    return courses.filter((c) => c.termId === currentTermId && c.type === 'SESSIONAL');
+  }, [courses, currentTermId]);
+
+  // Current semester credits ONLY (~18-20 cr, NOT 160 cr)
+  const currentTermCredits = useMemo(() => {
+    const total = currentCourses.reduce((sum, c) => sum + c.credits, 0);
+    return Math.round(total * 100) / 100;
+  }, [currentCourses]);
+
+  // Completed courses: strictly from completed terms (where gradePoint is recorded and term is not current)
+  const completedCourses = useMemo(() => {
+    return courses.filter((c) => c.termId !== currentTermId && c.gradePoint !== undefined);
+  }, [courses, currentTermId]);
+
+  // Completed credits: strictly accumulated from completed terms
+  const completedCredits = useMemo(() => {
+    const total = completedCourses.reduce((sum, c) => sum + c.credits, 0);
+    return Math.round(total * 100) / 100;
+  }, [completedCourses]);
+
+  // Cumulative CGPA: strictly calculated from completed terms
+  const cumulativeCGPA = useMemo(() => {
+    if (completedCourses.length === 0 || completedCredits === 0) return 0;
+
+    const totalGradePoints = completedCourses.reduce((sum, c) => {
+      return sum + c.credits * (c.gradePoint ?? 0);
+    }, 0);
+
+    const cgpa = totalGradePoints / completedCredits;
+    return Math.round(cgpa * 100) / 100;
+  }, [completedCourses, completedCredits]);
+
+  // Breakdown of credits per term
+  const termCreditsMap = useMemo(() => {
+    const map = {} as Record<TermId, number>;
+    for (const c of courses) {
+      map[c.termId] = Math.round(((map[c.termId] || 0) + c.credits) * 100) / 100;
+    }
+    return map;
+  }, [courses]);
+
+  // Breakdown of GPA per completed term
+  const termGpaMap = useMemo(() => {
+    const pointsMap: Record<string, number> = {};
+    const credsMap: Record<string, number> = {};
+
+    for (const c of completedCourses) {
+      if (c.gradePoint !== undefined) {
+        pointsMap[c.termId] = (pointsMap[c.termId] || 0) + c.credits * c.gradePoint;
+        credsMap[c.termId] = (credsMap[c.termId] || 0) + c.credits;
+      }
+    }
+
+    const gpaMap: Record<string, number> = {};
+    for (const term in credsMap) {
+      if (credsMap[term] > 0) {
+        gpaMap[term] = Math.round((pointsMap[term] / credsMap[term]) * 100) / 100;
+      }
+    }
+    return gpaMap;
+  }, [completedCourses]);
+
+  // 3. Mutation Handlers
+
+  /**
+   * Updates attendance record for a course
+   * Increments totalConducted by 1, and attended by 1 if isAttended is true.
+   */
+  const addAttendance = useCallback((courseCode: string, isAttended: boolean) => {
+    setCourses((prevCourses) =>
+      prevCourses.map((c) => {
+        if (c.code === courseCode) {
+          const currentAtt = c.attendance || { attended: 0, conducted: 0 };
+          return {
+            ...c,
+            attendance: {
+              conducted: currentAtt.conducted + 1,
+              attended: currentAtt.attended + (isAttended ? 1 : 0),
+            },
+          };
+        }
+        return c;
+      })
+    );
+  }, []);
+
+  /**
+   * Adds or updates a Class Test (CT) score and recalculates best-n scores
+   */
+  const addOrUpdateCT = useCallback(
+    (courseCode: string, ctIndex: number, score: number, outOf: number) => {
+      setCourses((prevCourses) =>
+        prevCourses.map((c) => {
+          if (c.code === courseCode) {
+            const currentCTs = [...(c.classTests || [])];
+            const clampedScore = Math.max(0, score);
+            const clampedOutOf = Math.max(1, outOf);
+
+            const updatedTest: ClassTest = {
+              id: currentCTs[ctIndex]?.id || `ct_${ctIndex + 1}`,
+              name: currentCTs[ctIndex]?.name || `CT ${ctIndex + 1}`,
+              score: clampedScore,
+              outOf: clampedOutOf,
+            };
+
+            if (ctIndex >= 0 && ctIndex < currentCTs.length) {
+              currentCTs[ctIndex] = updatedTest;
+            } else {
+              currentCTs.push(updatedTest);
+            }
+
+            const recalculatedCTs = recalculateBestNClassTests(currentCTs);
+
+            return {
+              ...c,
+              classTests: recalculatedCTs,
+            };
+          }
+          return c;
+        })
+      );
+    },
+    []
+  );
+
+  /**
+   * Assigns or updates a timetable slot for a day and periodIndex
+   */
+  const assignRoutineSlot = useCallback(
+    (
+      day: DayOfWeek | string,
+      periodIndex: number,
+      courseCode: string,
+      details?: RoutineSlotDetails
+    ) => {
+      setRoutineSlots((prevSlots) => {
+        const existingIndex = prevSlots.findIndex(
+          (s) => s.day === day && s.periodIndex === periodIndex
+        );
+
+        const slotToAssign: RoutineSlot = {
+          id: existingIndex >= 0 ? prevSlots[existingIndex].id : `slot_${day}_${periodIndex}`,
+          day,
+          periodIndex,
+          courseCode,
+          details,
+        };
+
+        if (existingIndex >= 0) {
+          const updated = [...prevSlots];
+          updated[existingIndex] = slotToAssign;
+          return updated;
+        } else {
+          return [...prevSlots, slotToAssign];
+        }
+      });
+    },
+    []
+  );
+
+  /**
+   * Removes a timetable slot for a day and periodIndex
+   */
+  const removeRoutineSlot = useCallback((day: DayOfWeek | string, periodIndex: number) => {
+    setRoutineSlots((prevSlots) =>
+      prevSlots.filter((s) => !(s.day === day && s.periodIndex === periodIndex))
+    );
+  }, []);
+
+  /**
+   * Resets the entire store to clean initial BUET IPE curriculum data
+   */
+  const resetToInitialData = useCallback(() => {
+    setCurrentTermId(initialTermId);
+    setCourses(INITIAL_BUET_COURSES);
+    setRoutineSlots(INITIAL_ROUTINE_SLOTS);
+  }, [initialTermId]);
+
+  return {
+    // State
+    currentTermId,
+    courses,
+    routineSlots,
+
+    // Selectors
+    currentCourses,
+    currentTheoryCourses,
+    currentSessionalCourses,
+    currentTermCredits,
+    completedCourses,
+    completedCredits,
+    cumulativeCGPA,
+    termCreditsMap,
+    termGpaMap,
+
+    // Actions
+    setCurrentTermId,
+    setCourses,
+    setRoutineSlots,
+    addAttendance,
+    addOrUpdateCT,
+    assignRoutineSlot,
+    removeRoutineSlot,
+    resetToInitialData,
+  };
+}
