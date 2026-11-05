@@ -65,6 +65,10 @@ export interface Course {
   // For current active term only:
   attendance?: AttendanceRecord;
   classTests?: ClassTest[];
+
+  // Archival continuous assessment history:
+  archivedAttendance?: AttendanceRecord;
+  archivedClassTests?: ClassTest[];
 }
 
 export interface RoutineSlotDetails {
@@ -103,6 +107,21 @@ export interface SemesterStoreSelectors {
   termGpaMap: Record<string, number>;
 }
 
+export interface SemesterGradeInput {
+  code: string;
+  finalGrade: string;
+  gradePoint: number;
+}
+
+export interface CompleteSemesterResult {
+  completedTermId: TermId;
+  nextTermId: TermId | null;
+  termGPA: number;
+  termCredits: number;
+  newCumulativeCGPA: number;
+  totalCompletedCredits: number;
+}
+
 export interface SemesterStoreActions {
   setCurrentTermId: (termId: TermId) => void;
   setCourses: React.Dispatch<React.SetStateAction<Course[]>>;
@@ -116,7 +135,36 @@ export interface SemesterStoreActions {
     details?: RoutineSlotDetails
   ) => void;
   removeRoutineSlot: (day: DayOfWeek | string, periodIndex: number) => void;
+  completeSemester: (grades: SemesterGradeInput[]) => CompleteSemesterResult;
+  switchTerm: (termId: TermId) => void;
   resetToInitialData: () => void;
 }
 
 export type SemesterStore = SemesterStoreState & SemesterStoreSelectors & SemesterStoreActions;
+
+/**
+ * Returns next academic term in chronological order, or null if final term (L-4 T-2).
+ */
+export function getNextTermId(currentTermId: TermId): TermId | null {
+  const index = ALL_TERM_IDS.indexOf(currentTermId);
+  if (index >= 0 && index < ALL_TERM_IDS.length - 1) {
+    return ALL_TERM_IDS[index + 1];
+  }
+  return null;
+}
+
+/**
+ * Official BUET Letter Grade to Grade Point Mapping (Ordinance Standard)
+ */
+export const BUET_GRADE_POINTS: Record<string, number> = {
+  'A+': 4.0,
+  'A': 3.75,
+  'A-': 3.5,
+  'B+': 3.25,
+  'B': 3.0,
+  'B-': 2.75,
+  'C+': 2.5,
+  'C': 2.25,
+  'D': 2.0,
+  'F': 0.0,
+};

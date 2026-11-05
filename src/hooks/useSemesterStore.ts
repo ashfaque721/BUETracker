@@ -7,11 +7,15 @@ import {
   DayOfWeek,
   ClassTest,
   SemesterStore,
+  SemesterGradeInput,
+  CompleteSemesterResult,
+  getNextTermId,
 } from '../types/semester';
 import {
   INITIAL_BUET_COURSES,
   INITIAL_ROUTINE_SLOTS,
 } from '../data/initialSemesterData';
+import { IPE_CURRICULUM_DATA } from '../utils/ipeCurriculum';
 
 /**
  * BUET Ordinance Best-n Class Test Recalculation Engine
@@ -242,6 +246,199 @@ export function useSemesterStore(initialTermId: TermId = 'L-2 T-1'): SemesterSto
   }, []);
 
   /**
+   * Completes the current active semester:
+   * 1. Archives continuous assessment (CT and attendance)
+   * 2. Ingests final letter grades and grade points into courses
+   * 3. Calculates Term GPA and updated Cumulative CGPA
+   * 4. Automatically advances currentTermId to next semester
+   * 5. Populates next semester courses and routine slots if needed
+   */
+  const completeSemester = useCallback(
+    (grades: SemesterGradeInput[]): CompleteSemesterResult => {
+      const gradeMap = new Map<string, SemesterGradeInput>();
+      grades.forEach((g) => gradeMap.set(g.code, g));
+
+      let termGradePoints = 0;
+      let termCredits = 0;
+
+      // Find current term courses to compute term GPA
+      const curCourses = courses.filter((c) => c.termId === currentTermId);
+      curCourses.forEach((c) => {
+        const g = gradeMap.get(c.code) || {
+          code: c.code,
+          finalGrade: 'A',
+          gradePoint: 3.75,
+        };
+        termGradePoints += c.credits * g.gradePoint;
+        termCredits += c.credits;
+      });
+
+      const termGPA =
+        termCredits > 0 ? Math.round((termGradePoints / termCredits) * 100) / 100 : 0;
+
+      const nextTerm = getNextTermId(currentTermId);
+
+      // Determine updated courses array with archived continuous data
+      let updatedCourses = courses.map((c) => {
+        if (c.termId === currentTermId) {
+          const g = gradeMap.get(c.code) || {
+            code: c.code,
+            finalGrade: 'A',
+            gradePoint: 3.75,
+          };
+          return {
+            ...c,
+            finalGrade: g.finalGrade,
+            gradePoint: g.gradePoint,
+            archivedAttendance: c.attendance ? { ...c.attendance } : undefined,
+            archivedClassTests: c.classTests ? [...c.classTests] : undefined,
+            attendance: undefined,
+            classTests: undefined,
+          };
+        }
+        return c;
+      });
+
+      // If next term exists, ensure next term courses and routine are loaded
+      if (nextTerm) {
+        const nextKey = nextTerm.replace(/[-\s]/g, '');
+        const hasNextTermCourses = updatedCourses.some((c) => c.termId === nextTerm);
+
+        if (!hasNextTermCourses) {
+          const nextCurriculum = (IPE_CURRICULUM_DATA as any)[nextKey];
+          if (nextCurriculum) {
+            const newCourses: Course[] = nextCurriculum.courses.map((cur: any) => ({
+              code: cur.code,
+              title: cur.title,
+              nickname: cur.nickname || cur.title,
+              credits: cur.credits,
+              type: cur.type.toUpperCase() === 'SESSIONAL' ? 'SESSIONAL' : 'THEORY',
+              termId: nextTerm,
+              teacher: cur.teacher,
+              room: cur.room,
+              color: cur.color,
+              attendance:
+                cur.type.toUpperCase() === 'THEORY'
+                  ? { attended: 0, conducted: 0 }
+                  : undefined,
+              classTests: cur.type.toUpperCase() === 'THEORY' ? [] : undefined,
+            }));
+            updatedCourses = [...updatedCourses, ...newCourses];
+          }
+        } else {
+          // If already in list, make sure theory courses have active tracking
+          updatedCourses = updatedCourses.map((c) => {
+            if (c.termId === nextTerm && c.type === 'THEORY' && !c.attendance) {
+              return {
+                ...c,
+                attendance: { attended: 0, conducted: 0 },
+                classTests: [],
+              };
+            }
+            return c;
+          });
+        }
+
+        // Load official routine slots for next term
+        const nextCurriculum = (IPE_CURRICULUM_DATA as any)[nextKey];
+        if (nextCurriculum && nextCurriculum.routineSlots) {
+          const newSlots: RoutineSlot[] = nextCurriculum.routineSlots.map((s: any) => ({
+            id: s.id || `slot_${s.day}_${s.periodId}`,
+            day: s.day,
+            periodIndex: s.periodId,
+            courseCode: s.customCode || '',
+            details: {
+              title: s.customNickname || s.customCode,
+              nickname: s.customNickname,
+              teacher: s.customTeacher,
+              room: s.customRoom,
+              span: s.span || 1,
+              type: s.periodId === 7 || (s.span && s.span > 1) ? 'SESSIONAL' : 'THEORY',
+            },
+          }));
+          setRoutineSlots(newSlots);
+        }
+
+        setCurrentTermId(nextTerm);
+      }
+
+      setCourses(updatedCourses);
+
+      // Calculate cumulative stats including newly completed term
+      const allCompleted = updatedCourses.filter(
+        (c) => (nextTerm ? c.termId !== nextTerm : true) && c.gradePoint !== undefined
+      );
+      const totalCreds = allCompleted.reduce((sum, c) => sum + c.credits, 0);
+      const totalPts = allCompleted.reduce((sum, c) => sum + c.credits * (c.gradePoint ?? 0), 0);
+      const newCumulativeCGPA =
+        totalCreds > 0 ? Math.round((totalPts / totalCreds) * 100) / 100 : 0;
+
+      return {
+        completedTermId: currentTermId,
+        nextTermId: nextTerm,
+        termGPA,
+        termCredits: Math.round(termCredits * 100) / 100,
+        newCumulativeCGPA,
+        totalCompletedCredits: Math.round(totalCreds * 100) / 100,
+      };
+    },
+    [courses, currentTermId]
+  );
+
+  /**
+   * Switches active term, ensuring authentic IPE courses and routine exist
+   */
+  const switchTerm = useCallback((termId: TermId) => {
+    setCurrentTermId(termId);
+    const key = termId.replace(/[-\s]/g, '');
+    const curriculum = (IPE_CURRICULUM_DATA as any)[key];
+
+    // Ensure courses exist for this term
+    setCourses((prevCourses) => {
+      const hasCourses = prevCourses.some((c) => c.termId === termId);
+      if (!hasCourses && curriculum) {
+        const newCourses: Course[] = curriculum.courses.map((cur: any) => ({
+          code: cur.code,
+          title: cur.title,
+          nickname: cur.nickname || cur.title,
+          credits: cur.credits,
+          type: cur.type.toUpperCase() === 'SESSIONAL' ? 'SESSIONAL' : 'THEORY',
+          termId: termId,
+          teacher: cur.teacher,
+          room: cur.room,
+          color: cur.color,
+          attendance:
+            cur.type.toUpperCase() === 'THEORY'
+              ? { attended: 0, conducted: 0 }
+              : undefined,
+          classTests: cur.type.toUpperCase() === 'THEORY' ? [] : undefined,
+        }));
+        return [...prevCourses, ...newCourses];
+      }
+      return prevCourses;
+    });
+
+    // Load routine slots for this term
+    if (curriculum && curriculum.routineSlots) {
+      const newSlots: RoutineSlot[] = curriculum.routineSlots.map((s: any) => ({
+        id: s.id || `slot_${s.day}_${s.periodId}`,
+        day: s.day,
+        periodIndex: s.periodId,
+        courseCode: s.customCode || '',
+        details: {
+          title: s.customNickname || s.customCode,
+          nickname: s.customNickname,
+          teacher: s.customTeacher,
+          room: s.customRoom,
+          span: s.span || 1,
+          type: s.periodId === 7 || (s.span && s.span > 1) ? 'SESSIONAL' : 'THEORY',
+        },
+      }));
+      setRoutineSlots(newSlots);
+    }
+  }, []);
+
+  /**
    * Resets the entire store to clean initial BUET IPE curriculum data
    */
   const resetToInitialData = useCallback(() => {
@@ -275,6 +472,8 @@ export function useSemesterStore(initialTermId: TermId = 'L-2 T-1'): SemesterSto
     addOrUpdateCT,
     assignRoutineSlot,
     removeRoutineSlot,
+    completeSemester,
+    switchTerm,
     resetToInitialData,
   };
 }

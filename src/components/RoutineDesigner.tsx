@@ -6,6 +6,7 @@ import {
   Course,
   CourseType,
 } from '../types';
+import { SemesterStore } from '../types/semester';
 import {
   Plus,
   Trash2,
@@ -13,11 +14,12 @@ import {
 } from 'lucide-react';
 import { IPE_CURRICULUM_DATA } from '../utils/ipeCurriculum';
 
-interface RoutineDesignerProps {
-  routine: RoutineMetadata;
-  courses: Course[];
+export interface RoutineDesignerProps {
+  store?: SemesterStore;
+  routine?: RoutineMetadata;
+  courses?: Course[];
   currentSemesterId?: string;
-  onUpdateRoutine: (updated: RoutineMetadata) => void;
+  onUpdateRoutine?: (updated: RoutineMetadata) => void;
   onLoadSampleRoutine?: () => void;
   onStartBlank?: () => void;
 }
@@ -34,17 +36,52 @@ const PERIODS: { id: number; name: string; timeRange: string }[] = [
 ];
 
 export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
+  store,
   routine,
-  courses,
+  courses = [],
   currentSemesterId,
   onUpdateRoutine,
 }) => {
   const timetableRef = useRef<HTMLDivElement>(null);
 
   const activeCurriculum = currentSemesterId ? IPE_CURRICULUM_DATA[currentSemesterId] : null;
+  const activeTermLabel = store?.currentTermId || activeCurriculum?.shortLabel || currentSemesterId || 'Term';
 
-  // Filter courses strictly for the active semester (combining official curriculum + user registered courses)
+  // Normalize timetable slots: read from store.routineSlots if provided, else fallback to routine.slots
+  const activeSlots = useMemo(() => {
+    if (store) {
+      return store.routineSlots.map((s) => ({
+        id: s.id,
+        day: s.day as DayOfWeek,
+        periodId: s.periodIndex,
+        span: s.details?.span || 1,
+        courseId: undefined,
+        customCode: s.courseCode,
+        customNickname: s.details?.nickname || s.details?.title || s.courseCode,
+        customTeacher: s.details?.teacher,
+        customRoom: s.details?.room,
+        type: s.details?.type,
+      }));
+    }
+    return routine?.slots || [];
+  }, [store, store?.routineSlots, routine?.slots]);
+
+  // Filter courses strictly for the active semester (ZERO leakage from other terms)
   const semesterCourseOptions = useMemo(() => {
+    if (store) {
+      // Strictly isolated to currentTermId courses from useSemesterStore
+      return store.currentCourses.map((c) => ({
+        id: c.code,
+        code: c.code,
+        title: c.title,
+        nickname: c.nickname || c.title,
+        credits: c.credits,
+        type: (c.type.toUpperCase() === 'SESSIONAL' ? 'sessional' : 'theory') as CourseType,
+        teacher: c.teacher,
+        room: c.room,
+      }));
+    }
+
     const map = new Map<
       string,
       {
@@ -93,7 +130,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
     }
 
     return Array.from(map.values());
-  }, [courses, currentSemesterId, activeCurriculum]);
+  }, [store, store?.currentCourses, courses, currentSemesterId, activeCurriculum]);
 
   const theoryCourses = semesterCourseOptions.filter((c) => c.type === 'theory');
   const sessionalCourses = semesterCourseOptions.filter((c) => c.type === 'sessional');
@@ -102,7 +139,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
   const [editingCell, setEditingCell] = useState<{
     day: DayOfWeek;
     periodId: number;
-    existingSlot?: RoutineSlot;
+    existingSlot?: (typeof activeSlots)[0];
   } | null>(null);
 
   const [formCode, setFormCode] = useState('');
@@ -114,7 +151,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
   const [formCourseId, setFormCourseId] = useState<string>('');
 
   const handleCellClick = (day: DayOfWeek, periodId: number) => {
-    const existing = routine.slots.find((s) => s.day === day && s.periodId === periodId);
+    const existing = activeSlots.find((s) => s.day === day && s.periodId === periodId);
     if (existing) {
       setFormCode(existing.customCode || '');
       setFormNickname(existing.customNickname || '');
@@ -124,7 +161,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
       setFormCourseId(existing.courseId || '');
 
       const matchedCourse = semesterCourseOptions.find(
-        (c) => c.id === existing.courseId || c.code === existing.customCode
+        (c) => c.code === existing.customCode
       );
       setFormType(
         matchedCourse?.type ||
@@ -168,42 +205,63 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
     e.preventDefault();
     if (!editingCell || !formCode.trim()) return;
 
-    let updatedSlots = [...routine.slots];
+    const code = formCode.trim().toUpperCase();
+    const title = formNickname.trim() || code;
+    const teacher = formTeacher.trim() || undefined;
+    const room = formRoom.trim() || undefined;
+    const span = formSpan;
+    const type = formType === 'sessional' ? 'SESSIONAL' : 'THEORY';
 
-    // Remove old slot if updating
-    if (editingCell.existingSlot) {
-      updatedSlots = updatedSlots.filter((s) => s.id !== editingCell.existingSlot!.id);
+    if (store) {
+      store.assignRoutineSlot(editingCell.day, editingCell.periodId, code, {
+        title,
+        nickname: title,
+        teacher,
+        room,
+        span,
+        type,
+      });
+    } else if (onUpdateRoutine && routine) {
+      let updatedSlots = [...routine.slots];
+      if (editingCell.existingSlot) {
+        updatedSlots = updatedSlots.filter((s) => s.id !== editingCell.existingSlot!.id);
+      }
+
+      const newSlot: RoutineSlot = {
+        id: editingCell.existingSlot ? editingCell.existingSlot.id : `slot_${Date.now()}`,
+        day: editingCell.day,
+        periodId: editingCell.periodId,
+        span,
+        courseId: formCourseId || undefined,
+        customCode: code,
+        customNickname: title,
+        customTeacher: teacher,
+        customRoom: room,
+      };
+
+      updatedSlots.push(newSlot);
+      onUpdateRoutine({
+        ...routine,
+        slots: updatedSlots,
+      });
     }
-
-    const newSlot: RoutineSlot = {
-      id: editingCell.existingSlot ? editingCell.existingSlot.id : `slot_${Date.now()}`,
-      day: editingCell.day,
-      periodId: editingCell.periodId,
-      span: formSpan,
-      courseId: formCourseId || undefined,
-      customCode: formCode.trim().toUpperCase(),
-      customNickname: formNickname.trim() || formCode.trim(),
-      customTeacher: formTeacher.trim() || undefined,
-      customRoom: formRoom.trim() || undefined,
-    };
-
-    updatedSlots.push(newSlot);
-
-    onUpdateRoutine({
-      ...routine,
-      slots: updatedSlots,
-    });
 
     setEditingCell(null);
   };
 
   const handleDeleteSlot = () => {
-    if (!editingCell?.existingSlot) return;
-    const updatedSlots = routine.slots.filter((s) => s.id !== editingCell.existingSlot!.id);
-    onUpdateRoutine({
-      ...routine,
-      slots: updatedSlots,
-    });
+    if (!editingCell) return;
+
+    if (store) {
+      store.removeRoutineSlot(editingCell.day, editingCell.periodId);
+    } else if (editingCell.existingSlot && onUpdateRoutine && routine) {
+      const updatedSlots = routine.slots.filter((s) => s.id !== editingCell.existingSlot!.id);
+      onUpdateRoutine({
+        ...routine,
+        slots: updatedSlots,
+      });
+    }
+
     setEditingCell(null);
   };
 
@@ -292,7 +350,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                         return null;
                       }
 
-                      const slot = routine.slots.find((s) => s.day === day && s.periodId === pId);
+                      const slot = activeSlots.find((s) => s.day === day && s.periodId === pId);
                       const span = slot?.span || 1;
 
                       if (span > 1) {
@@ -302,10 +360,12 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                       }
 
                       // Match associated course type if available
-                      const matchedCourse = courses.find(
-                        (c) => c.id === slot?.courseId || (slot?.customCode && c.code === slot.customCode)
+                      const matchedCourse = semesterCourseOptions.find(
+                        (c) => c.code === slot?.customCode
                       );
                       const isSessional =
+                        (slot as any)?.type === 'SESSIONAL' ||
+                        (slot as any)?.type === 'sessional' ||
                         matchedCourse?.type === 'sessional' ||
                         span > 1 ||
                         /lab|sessional|drawing|shop/i.test(slot?.customNickname || '');
@@ -373,7 +433,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
 
                     {/* Period 7 (Afternoon Lab Slot: 2:30 - 5:00) */}
                     {(() => {
-                      const slot = routine.slots.find((s) => s.day === day && s.periodId === 7);
+                      const slot = activeSlots.find((s) => s.day === day && s.periodId === 7);
                       return (
                         <td
                           onClick={() => handleCellClick(day, 7)}
@@ -446,7 +506,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
               <div>
                 <label className="block text-zinc-400 font-medium mb-1 text-[11px] flex items-center justify-between">
                   <span>
-                    Course Dropdown ({activeCurriculum?.shortLabel || currentSemesterId || 'Curriculum'})
+                    Course Dropdown ({activeTermLabel})
                   </span>
                   <span className="text-[10px] text-emerald-400 font-normal">Auto-fills slot</span>
                 </label>
@@ -455,7 +515,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                   onChange={(e) => handleCourseSelect(e.target.value)}
                   className="w-full bg-[#1b1d24] border border-white/[0.08] rounded-lg px-2.5 py-1.5 text-zinc-200 focus:outline-none focus:border-white/20 transition-colors cursor-pointer text-xs"
                 >
-                  <option value="">-- Select {activeCurriculum?.shortLabel || ''} Course or Enter Below --</option>
+                  <option value="">-- Select {activeTermLabel} Course or Enter Below --</option>
                   {theoryCourses.length > 0 && (
                     <optgroup label="Theory Courses (Continuous Assessment)">
                       {theoryCourses.map((c) => (

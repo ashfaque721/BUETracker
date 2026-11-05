@@ -37,9 +37,13 @@ import {
   ChevronDown,
   Download,
   FileDown,
+  GraduationCap,
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
+import { useSemesterStore } from './hooks/useSemesterStore';
+import { CompleteSemesterDialog } from './components/CompleteSemesterDialog';
+import { CompleteSemesterResult, TermId } from './types/semester';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'routine' | 'assessment' | 'courses' | 'analytics'>('routine');
@@ -58,6 +62,20 @@ export function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showCompleteSemesterModal, setShowCompleteSemesterModal] = useState(false);
+
+  // Unified BUET Semester Store
+  const store = useSemesterStore('L-2 T-2');
+
+  const handleSemesterCompleted = (result: CompleteSemesterResult) => {
+    showToast(
+      `🎉 Completed ${result.completedTermId} (GPA ${result.termGPA.toFixed(2)})! Advanced to ${result.nextTermId || 'Graduation'}`
+    );
+    if (result.nextTermId) {
+      const nextSemKey = result.nextTermId.replace(/[-\s]/g, '');
+      setSettings((prev) => ({ ...prev, currentSemesterId: nextSemKey }));
+    }
+  };
 
   // Editable Title State (Left top bar)
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -215,6 +233,9 @@ export function App() {
   const handleSwitchSemester = async (newSemId: string) => {
     try {
       const semCurriculum = IPE_CURRICULUM_DATA[newSemId] || IPE_CURRICULUM_DATA.L2T1;
+      if (semCurriculum && semCurriculum.shortLabel) {
+        store.switchTerm(semCurriculum.shortLabel as TermId);
+      }
       const newRoutine = getIpeRoutineForSemester(newSemId);
 
       const existingSemCourses = courses.filter((c) => c.semesterId === newSemId);
@@ -464,8 +485,16 @@ export function App() {
               </div>
             </div>
             <p className="text-[11px] text-zinc-400 mt-2 tabular-nums">
-              {deptShort} • {IPE_CURRICULUM_DATA[settings.currentSemesterId]?.totalCredits || 20} credits
+              {deptShort} • {store.currentTermCredits} credits
             </p>
+
+            <button
+              onClick={() => setShowCompleteSemesterModal(true)}
+              className="w-full mt-2.5 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[11px] font-medium transition-colors cursor-pointer"
+            >
+              <GraduationCap className="w-3.5 h-3.5" />
+              <span>Complete {store.currentTermId}</span>
+            </button>
           </div>
 
           {/* Navigation List (vertical) */}
@@ -507,7 +536,7 @@ export function App() {
                 {settings.studentName?.split(' ')[0] || 'Ashfaque'}
               </span>
               <span className="text-[10px] text-zinc-500 block truncate tabular-nums">
-                {overallCgpa.gpa.toFixed(2)} CGPA
+                {store.cumulativeCGPA > 0 ? store.cumulativeCGPA.toFixed(2) : overallCgpa.gpa.toFixed(2)} CGPA
               </span>
             </div>
           </div>
@@ -566,12 +595,22 @@ export function App() {
                     </h2>
                   )}
                   <span className="px-2 py-0.5 rounded-md bg-white/[0.06] border border-white/[0.08] text-[11px] font-medium text-emerald-400">
-                    {IPE_CURRICULUM_DATA[settings.currentSemesterId]?.shortLabel || termShort}
+                    {store.currentTermId}
                   </span>
                 </div>
 
                 {/* Right: Action Buttons with cursor-pointer */}
                 <div className="flex items-center gap-2.5">
+                  {/* Complete Semester / Ingest BIIS Button */}
+                  <button
+                    onClick={() => setShowCompleteSemesterModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-xs font-semibold border border-emerald-500/30 transition-colors shadow-xs cursor-pointer"
+                    title="Archive continuous marks, record final grades, and advance to next semester"
+                  >
+                    <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Complete Semester / BIIS</span>
+                  </button>
+
                   <button
                     onClick={handleLoadSampleRoutine}
                     className="text-xs text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
@@ -614,6 +653,7 @@ export function App() {
 
               {/* The Timetable Grid */}
               <RoutineDesigner
+                store={store}
                 routine={routine}
                 courses={courses}
                 currentSemesterId={settings.currentSemesterId}
@@ -626,7 +666,7 @@ export function App() {
         {/* Tab 2: Minimalist Assessment Tab (Connected to useSemesterStore) */}
         {activeTab === 'assessment' && (
           <div className="p-8 w-full max-w-[1380px] mx-auto animate-fade-in">
-            <AssessmentView />
+            <AssessmentView store={store} />
           </div>
         )}
 
@@ -679,6 +719,13 @@ export function App() {
         onRerunWizard={() => {
           setSettings({ ...settings, isOnboarded: false });
         }}
+      />
+      {/* Complete Semester / Ingest BIIS Modal */}
+      <CompleteSemesterDialog
+        isOpen={showCompleteSemesterModal}
+        onClose={() => setShowCompleteSemesterModal(false)}
+        store={store}
+        onCompleted={handleSemesterCompleted}
       />
     </div>
   );
