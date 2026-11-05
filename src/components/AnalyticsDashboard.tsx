@@ -53,16 +53,18 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
   const progressionData = BUET_SEMESTERS.map((sem) => {
     const semCourses = courses.filter((c) => c.semesterId === sem.id);
-    const completedCourses = semCourses.filter((c) => !c.isOngoing && c.gradePoint !== undefined);
+    const gradedCourses = semCourses.filter(
+      (c) => typeof c.gradePoint === 'number' && !isNaN(c.gradePoint)
+    );
 
     let termGpa: number | null = null;
     let termCredits = 0;
     let termPoints = 0;
 
-    if (completedCourses.length > 0) {
-      completedCourses.forEach((c) => {
+    if (gradedCourses.length > 0) {
+      gradedCourses.forEach((c) => {
         termCredits += c.credits;
-        termPoints += c.credits * (c.gradePoint || 0);
+        termPoints += c.credits * (c.gradePoint ?? 0);
       });
 
       termGpa = termCredits > 0 ? Number((termPoints / termCredits).toFixed(2)) : null;

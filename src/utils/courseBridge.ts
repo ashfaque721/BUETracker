@@ -2,10 +2,39 @@ import type { Course as AppCourse, CourseType as AppCourseType } from '../types'
 import type { Course as StoreCourse, TermId, CourseType as StoreCourseType } from '../types/semester';
 
 /**
+ * Normalizes course codes for robust equality checks (e.g. "ME 243" === " ME 243 ")
+ */
+export function normalizeCourseCode(code: string): string {
+  return (code || '').replace(/\s+/g, ' ').trim().toUpperCase();
+}
+
+/**
+ * Converts TermId e.g. "L-2 T-2" -> "L2T2"
+ */
+export function termIdToSemId(termId: TermId | string): string {
+  const digits = (termId || '').replace(/[^0-9]/g, '');
+  if (digits.length >= 2) {
+    return `L${digits[0]}T${digits[1]}`;
+  }
+  return (termId || '').replace(/[-\s]/g, '');
+}
+
+/**
+ * Converts SemesterId e.g. "L2T2", "L-2 T-2", "L2_T2" -> "L-2 T-2"
+ */
+export function semIdToTermId(semId: string): TermId {
+  const digits = (semId || '').replace(/[^0-9]/g, '');
+  if (digits.length >= 2) {
+    return `L-${digits[0]} T-${digits[1]}` as TermId;
+  }
+  return (semId as TermId) || 'L-2 T-1';
+}
+
+/**
  * Converts a canonical StoreCourse (from useSemesterStore) to legacy AppCourse (for CourseManager & Analytics)
  */
 export function storeCourseToAppCourse(sc: StoreCourse, currentTermId: TermId): AppCourse {
-  const semId = sc.termId.replace(/[-\s]/g, '');
+  const semId = termIdToSemId(sc.termId);
   const isOngoing = sc.termId === currentTermId;
 
   return {
@@ -22,6 +51,7 @@ export function storeCourseToAppCourse(sc: StoreCourse, currentTermId: TermId): 
     isOngoing,
     grade: sc.finalGrade,
     gradePoint: sc.gradePoint,
+    projectedGradePoint: sc.gradePoint,
     attendance: sc.attendance
       ? { totalConducted: sc.attendance.conducted, attended: sc.attendance.attended }
       : undefined,
@@ -40,8 +70,7 @@ export function storeCourseToAppCourse(sc: StoreCourse, currentTermId: TermId): 
  * Converts an AppCourse (from CourseManager) to StoreCourse (for useSemesterStore)
  */
 export function appCourseToStoreCourse(ac: AppCourse): StoreCourse {
-  const m = ac.semesterId.match(/L(\d)T(\d)/i);
-  const termId: TermId = m ? (`L-${m[1]} T-${m[2]}` as TermId) : ('L-2 T-2' as TermId);
+  const termId = semIdToTermId(ac.semesterId);
 
   return {
     code: ac.code,
@@ -67,20 +96,4 @@ export function appCourseToStoreCourse(ac: AppCourse): StoreCourse {
         }))
       : undefined,
   };
-}
-
-/**
- * Converts TermId e.g. "L-2 T-2" -> "L2T2"
- */
-export function termIdToSemId(termId: TermId | string): string {
-  return termId.replace(/[-\s]/g, '');
-}
-
-/**
- * Converts SemesterId e.g. "L2T2" -> "L-2 T-2"
- */
-export function semIdToTermId(semId: string): TermId {
-  const m = semId.match(/L(\d)T(\d)/i);
-  if (m) return `L-${m[1]} T-${m[2]}` as TermId;
-  return (semId as TermId) || 'L-2 T-2';
 }

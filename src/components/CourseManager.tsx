@@ -39,6 +39,7 @@ interface CourseManagerProps {
   onSelectSemester: (semesterId: string) => void;
   onAddCourse: (course: Course) => void;
   onUpdateCourse: (course: Course) => void;
+  onBulkUpdateCourses?: (courses: Course[]) => void;
   onDeleteCourse: (courseId: string) => void;
   onBulkAddCourses: (courses: Course[]) => void;
 }
@@ -49,6 +50,7 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
   onSelectSemester,
   onAddCourse,
   onUpdateCourse,
+  onBulkUpdateCourses,
   onDeleteCourse,
   onBulkAddCourses,
 }) => {
@@ -83,30 +85,42 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
   const semesterCourses = courses.filter((c) => c.semesterId === viewedSemesterId);
   const isOngoingSemester = viewedSemesterId === activeSemesterId;
 
+  // Exact BUET Term GPA: sum(credits * gradePoint) / sum(credits) for all graded courses in term
+  const gradedSemesterCourses = semesterCourses.filter(
+    (c) => typeof c.gradePoint === 'number' && !isNaN(c.gradePoint)
+  );
   const semesterGpa = calculateGPA(
-    semesterCourses.map((c) => ({
+    gradedSemesterCourses.map((c) => ({
       credits: c.credits,
-      gradePoint: c.isOngoing ? (c.gradePoint ?? c.projectedGradePoint ?? 4.0) : (c.gradePoint ?? 4.0),
+      gradePoint: c.gradePoint,
     }))
   );
 
-  const gradedCourses = courses.filter((c) => c.gradePoint !== undefined && c.gradePoint > 0);
+  // Exact Cumulative CGPA: sum(credits * gradePoint) / sum(credits) for all graded courses across degree
+  const gradedCourses = courses.filter(
+    (c) => typeof c.gradePoint === 'number' && !isNaN(c.gradePoint)
+  );
   const cumulativeCgpa = calculateGPA(
     gradedCourses.map((c) => ({
       credits: c.credits,
-      gradePoint: c.gradePoint ?? 4.0,
+      gradePoint: c.gradePoint,
     }))
   );
 
+  const termTotalCredits = semesterCourses.reduce((sum, c) => sum + c.credits, 0);
+
   const handleSetAllSemesterGrades = (grade: string, gradePoint: number) => {
-    semesterCourses.forEach((c) => {
-      onUpdateCourse({
-        ...c,
-        grade,
-        gradePoint,
-        projectedGradePoint: gradePoint,
-      });
-    });
+    const updatedList = semesterCourses.map((c) => ({
+      ...c,
+      grade,
+      gradePoint,
+      projectedGradePoint: gradePoint,
+    }));
+    if (onBulkUpdateCourses) {
+      onBulkUpdateCourses(updatedList);
+    } else {
+      updatedList.forEach((c) => onUpdateCourse(c));
+    }
   };
 
   const handleCreateCourse = (e: React.FormEvent) => {
@@ -342,9 +356,11 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
           <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-zinc-900 border border-white/[0.08] text-xs tabular-nums">
             <span className="text-zinc-200 font-semibold font-sans">{activeSemester.shortLabel}</span>
             <span className="text-zinc-600">•</span>
-            <span className="text-zinc-400">{semesterGpa.totalCredits} Cr</span>
+            <span className="text-zinc-400">{termTotalCredits > 0 ? termTotalCredits : semesterGpa.totalCredits} Cr</span>
             <span className="text-zinc-600">•</span>
-            <span className="text-emerald-400 font-bold">{semesterGpa.gpa.toFixed(2)} GPA</span>
+            <span className="text-emerald-400 font-bold">
+              {gradedSemesterCourses.length > 0 ? `${semesterGpa.gpa.toFixed(2)} GPA` : '— GPA'}
+            </span>
             {cumulativeCgpa.totalCredits > 0 && (
               <>
                 <span className="text-zinc-600">•</span>
@@ -627,9 +643,19 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
                       <td className="p-3.5 text-center">
                         <div className="inline-flex items-center justify-center gap-1.5">
                           <select
-                            value={c.grade || (c.projectedGradePoint ? BUET_GRADE_SCALE.find((g) => g.gradePoint === c.projectedGradePoint)?.grade : 'A+') || 'A+'}
+                            value={c.grade || (c.projectedGradePoint ? BUET_GRADE_SCALE.find((g) => g.gradePoint === c.projectedGradePoint)?.grade : '') || ''}
                             onChange={(e) => {
-                              const match = BUET_GRADE_SCALE.find((g) => g.grade === e.target.value);
+                              const val = e.target.value;
+                              if (!val) {
+                                onUpdateCourse({
+                                  ...c,
+                                  grade: undefined,
+                                  gradePoint: undefined,
+                                  projectedGradePoint: undefined,
+                                });
+                                return;
+                              }
+                              const match = BUET_GRADE_SCALE.find((g) => g.grade === val);
                               if (match) {
                                 onUpdateCourse({
                                   ...c,
@@ -642,6 +668,9 @@ export const CourseManager: React.FC<CourseManagerProps> = ({
                             className="bg-[#1b1d24] border border-white/[0.12] rounded-lg px-2.5 py-1 text-xs font-semibold text-zinc-100 cursor-pointer tabular-nums hover:border-emerald-500/60 focus:outline-none focus:border-emerald-500 transition-colors"
                             title="Click to select course grade and update CGPA live"
                           >
+                            <option value="" className="bg-[#14151a] text-zinc-400">
+                              -- Grade --
+                            </option>
                             {BUET_GRADE_SCALE.map((g) => (
                               <option key={g.grade} value={g.grade} className="bg-[#14151a]">
                                 {g.grade} ({g.gradePoint.toFixed(2)})

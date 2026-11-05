@@ -87,8 +87,13 @@ export function useSemesterStore(initialTermId: TermId = 'L-2 T-1'): SemesterSto
 
   // Completed courses: strictly from completed terms (where gradePoint is recorded and term is not current)
   const completedCourses = useMemo(() => {
-    return courses.filter((c) => c.termId !== currentTermId && c.gradePoint !== undefined);
+    return courses.filter((c) => c.termId !== currentTermId && typeof c.gradePoint === 'number' && !isNaN(c.gradePoint));
   }, [courses, currentTermId]);
+
+  // All graded courses across the entire degree (prior completed terms + current term if graded)
+  const allGradedCourses = useMemo(() => {
+    return courses.filter((c) => typeof c.gradePoint === 'number' && !isNaN(c.gradePoint));
+  }, [courses]);
 
   // Completed credits: strictly accumulated from completed terms
   const completedCredits = useMemo(() => {
@@ -96,17 +101,21 @@ export function useSemesterStore(initialTermId: TermId = 'L-2 T-1'): SemesterSto
     return Math.round(total * 100) / 100;
   }, [completedCourses]);
 
-  // Cumulative CGPA: strictly calculated from completed terms
+  // Cumulative CGPA: calculated from all graded courses across the degree (prior completed + any graded current courses)
   const cumulativeCGPA = useMemo(() => {
-    if (completedCourses.length === 0 || completedCredits === 0) return 0;
+    const targetCourses = allGradedCourses.length > 0 ? allGradedCourses : completedCourses;
+    if (targetCourses.length === 0) return 0;
 
-    const totalGradePoints = completedCourses.reduce((sum, c) => {
+    const totalCredits = targetCourses.reduce((sum, c) => sum + c.credits, 0);
+    if (totalCredits === 0) return 0;
+
+    const totalGradePoints = targetCourses.reduce((sum, c) => {
       return sum + c.credits * (c.gradePoint ?? 0);
     }, 0);
 
-    const cgpa = totalGradePoints / completedCredits;
+    const cgpa = totalGradePoints / totalCredits;
     return Math.round(cgpa * 100) / 100;
-  }, [completedCourses, completedCredits]);
+  }, [allGradedCourses, completedCourses]);
 
   // Breakdown of credits per term
   const termCreditsMap = useMemo(() => {
@@ -117,13 +126,13 @@ export function useSemesterStore(initialTermId: TermId = 'L-2 T-1'): SemesterSto
     return map;
   }, [courses]);
 
-  // Breakdown of GPA per completed term
+  // Breakdown of GPA per term for all terms with assigned grades
   const termGpaMap = useMemo(() => {
     const pointsMap: Record<string, number> = {};
     const credsMap: Record<string, number> = {};
 
-    for (const c of completedCourses) {
-      if (c.gradePoint !== undefined) {
+    for (const c of courses) {
+      if (typeof c.gradePoint === 'number' && !isNaN(c.gradePoint)) {
         pointsMap[c.termId] = (pointsMap[c.termId] || 0) + c.credits * c.gradePoint;
         credsMap[c.termId] = (credsMap[c.termId] || 0) + c.credits;
       }
@@ -136,7 +145,7 @@ export function useSemesterStore(initialTermId: TermId = 'L-2 T-1'): SemesterSto
       }
     }
     return gpaMap;
-  }, [completedCourses]);
+  }, [courses]);
 
   // 3. Mutation Handlers
 
@@ -465,9 +474,14 @@ export function useSemesterStore(initialTermId: TermId = 'L-2 T-1'): SemesterSto
    */
   const updateCourseGrade = useCallback(
     (termId: TermId, courseCode: string, finalGrade: string, gradePoint: number) => {
+      const normCode = courseCode.replace(/\s+/g, ' ').trim().toUpperCase();
+      const normTerm = termId.replace(/[-\s]/g, '');
       setCourses((prev) =>
         prev.map((c) => {
-          if (c.termId === termId && c.code === courseCode) {
+          if (
+            c.termId.replace(/[-\s]/g, '') === normTerm &&
+            c.code.replace(/\s+/g, ' ').trim().toUpperCase() === normCode
+          ) {
             return {
               ...c,
               finalGrade,

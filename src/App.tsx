@@ -49,6 +49,7 @@ import {
   appCourseToStoreCourse,
   termIdToSemId,
   semIdToTermId,
+  normalizeCourseCode,
 } from './utils/courseBridge';
 
 export function App() {
@@ -405,11 +406,91 @@ export function App() {
 
   const handleUpdateCourse = async (course: Course) => {
     await db.courses.put(course);
-    setCourses((prev) => prev.map((c) => (c.id === course.id ? course : c)));
+    const normCode = normalizeCourseCode(course.code);
+    const semId = termIdToSemId(course.semesterId);
+    const termId = semIdToTermId(course.semesterId);
+
+    // Update local courses state matching by id OR (code and semesterId)
+    setCourses((prev) => {
+      const exists = prev.some(
+        (c) => c.id === course.id || (normalizeCourseCode(c.code) === normCode && termIdToSemId(c.semesterId) === semId)
+      );
+      if (exists) {
+        return prev.map((c) => {
+          if (c.id === course.id || (normalizeCourseCode(c.code) === normCode && termIdToSemId(c.semesterId) === semId)) {
+            return { ...c, ...course };
+          }
+          return c;
+        });
+      }
+      return [...prev, course];
+    });
+
     const sc = appCourseToStoreCourse(course);
-    store.setCourses((prev) =>
-      prev.map((c) => (c.code === sc.code && c.termId === sc.termId ? sc : c))
-    );
+    // Update unified store.courses matching by normalized code and termId
+    store.setCourses((prev) => {
+      const exists = prev.some(
+        (c) => normalizeCourseCode(c.code) === normCode && semIdToTermId(c.termId) === termId
+      );
+      if (exists) {
+        return prev.map((c) => {
+          if (normalizeCourseCode(c.code) === normCode && semIdToTermId(c.termId) === termId) {
+            return {
+              ...c,
+              ...sc,
+              finalGrade: sc.finalGrade,
+              gradePoint: sc.gradePoint,
+            };
+          }
+          return c;
+        });
+      }
+      return [...prev, sc];
+    });
+  };
+
+  const handleBulkUpdateCourses = async (updatedList: Course[]) => {
+    if (updatedList.length === 0) return;
+    await db.courses.bulkPut(updatedList);
+
+    setCourses((prev) => {
+      const codeMap = new Map(
+        updatedList.map((c) => [`${termIdToSemId(c.semesterId)}_${normalizeCourseCode(c.code)}`, c])
+      );
+      const idMap = new Map(updatedList.map((c) => [c.id, c]));
+
+      return prev.map((c) => {
+        const key = `${termIdToSemId(c.semesterId)}_${normalizeCourseCode(c.code)}`;
+        return idMap.get(c.id) || codeMap.get(key) || c;
+      });
+    });
+
+    const newStoreList = updatedList.map(appCourseToStoreCourse);
+    store.setCourses((prev) => {
+      const storeMap = new Map(
+        newStoreList.map((sc) => [`${semIdToTermId(sc.termId)}_${normalizeCourseCode(sc.code)}`, sc])
+      );
+
+      const updated = prev.map((c) => {
+        const key = `${semIdToTermId(c.termId)}_${normalizeCourseCode(c.code)}`;
+        const match = storeMap.get(key);
+        if (match) {
+          storeMap.delete(key);
+          return {
+            ...c,
+            ...match,
+            finalGrade: match.finalGrade,
+            gradePoint: match.gradePoint,
+          };
+        }
+        return c;
+      });
+
+      // Append any courses not already in store
+      return [...updated, ...Array.from(storeMap.values())];
+    });
+
+    showToast(`Updated grades for ${updatedList.length} courses`);
   };
 
   const handleDeleteCourse = async (courseId: string) => {
@@ -487,10 +568,12 @@ export function App() {
     }
   };
 
-  // Summary Metrics for Header
-  const completedCourses = courses.filter((c) => !c.isOngoing && c.gradePoint !== undefined);
+  // Summary Metrics: Exact BUET CGPA calculated from all graded courses across the entire degree
+  const allGradedAppCourses = appCourses.filter(
+    (c) => typeof c.gradePoint === 'number' && !isNaN(c.gradePoint)
+  );
   const overallCgpa = calculateGPA(
-    completedCourses.map((c) => ({ credits: c.credits, gradePoint: c.gradePoint }))
+    allGradedAppCourses.map((c) => ({ credits: c.credits, gradePoint: c.gradePoint }))
   );
 
   if (isLoading) {
@@ -605,7 +688,11 @@ export function App() {
                 {settings.studentName?.split(' ')[0] || 'Ashfaque'}
               </span>
               <span className="text-[10px] text-zinc-500 block truncate tabular-nums">
-                {store.cumulativeCGPA > 0 ? store.cumulativeCGPA.toFixed(2) : overallCgpa.gpa.toFixed(2)} CGPA
+                {overallCgpa.totalCredits > 0
+                  ? `${overallCgpa.gpa.toFixed(2)} CGPA`
+                  : store.cumulativeCGPA > 0
+                  ? `${store.cumulativeCGPA.toFixed(2)} CGPA`
+                  : '0.00 CGPA'}
               </span>
             </div>
           </div>
@@ -748,6 +835,7 @@ export function App() {
               onSelectSemester={handleSwitchSemester}
               onAddCourse={handleAddCourse}
               onUpdateCourse={handleUpdateCourse}
+              onBulkUpdateCourses={handleBulkUpdateCourses}
               onDeleteCourse={handleDeleteCourse}
               onBulkAddCourses={handleBulkAddCourses}
             />
