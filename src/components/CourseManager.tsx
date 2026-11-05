@@ -181,7 +181,7 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                 )}
                 {semCourses.length > 0 && (
-                  <span className="text-xs text-zinc-400 font-mono tabular-nums">({semCourses.length})</span>
+                  <span className="text-xs text-zinc-400 tabular-nums">({semCourses.length})</span>
                 )}
               </button>
             );
@@ -189,7 +189,7 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
         </div>
 
         {/* Term Metrics Capsule */}
-        <div className="hidden sm:flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-zinc-900 border border-white/[0.08] text-xs font-mono tabular-nums">
+        <div className="hidden sm:flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-zinc-900 border border-white/[0.08] text-xs tabular-nums">
           <span className="text-zinc-200 font-semibold font-sans">{activeSemester.label}</span>
           <span className="text-zinc-600">•</span>
           <span className="text-zinc-400">{semesterGpa.totalCredits} Credits</span>
@@ -262,7 +262,7 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
                     placeholder="ME 243"
                     value={newCode}
                     onChange={(e) => setNewCode(e.target.value)}
-                    className="w-full bg-zinc-900 border border-white/[0.08] rounded-xl px-3 py-2 text-zinc-100 font-mono tabular-nums font-bold focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-zinc-900 border border-white/[0.08] rounded-xl px-3 py-2 text-zinc-100 tabular-nums font-bold focus:outline-none focus:border-emerald-500"
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -281,7 +281,7 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
                   <select
                     value={newCredits}
                     onChange={(e) => setNewCredits(parseFloat(e.target.value))}
-                    className="w-full bg-zinc-900 border border-white/[0.08] rounded-xl px-3 py-2 text-zinc-100 font-mono tabular-nums focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-zinc-900 border border-white/[0.08] rounded-xl px-3 py-2 text-zinc-100 tabular-nums focus:outline-none focus:border-emerald-500"
                   >
                     <option value={0.75}>0.75 cr (Lab Sessional)</option>
                     <option value={1.5}>1.50 cr (Lab Sessional)</option>
@@ -323,7 +323,7 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
                     placeholder="IPE 317"
                     value={newRoom}
                     onChange={(e) => setNewRoom(e.target.value)}
-                    className="w-full bg-zinc-900 border border-white/[0.08] rounded-xl px-3 py-2 text-zinc-100 font-mono tabular-nums focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-zinc-900 border border-white/[0.08] rounded-xl px-3 py-2 text-zinc-100 tabular-nums focus:outline-none focus:border-emerald-500"
                   />
                 </div>
 
@@ -337,7 +337,7 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
                         const match = BUET_GRADE_SCALE.find((g) => g.grade === e.target.value);
                         if (match) setNewGradePoint(match.gradePoint);
                       }}
-                      className="w-full bg-zinc-900 border border-white/[0.08] rounded-xl px-3 py-2 text-zinc-100 font-mono tabular-nums focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-zinc-900 border border-white/[0.08] rounded-xl px-3 py-2 text-zinc-100 tabular-nums focus:outline-none focus:border-emerald-500"
                     >
                       {BUET_GRADE_SCALE.map((g) => (
                         <option key={g.grade} value={g.grade}>
@@ -393,7 +393,7 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
                 <tbody className="divide-y divide-white/[0.04]">
                   {semesterCourses.map((c) => (
                     <tr key={c.id} className="hover:bg-zinc-800/40 transition">
-                      <td className="p-3.5 font-bold text-zinc-100 font-mono tabular-nums flex items-center gap-2">
+                      <td className="p-3.5 font-bold text-zinc-100 tabular-nums flex items-center gap-2">
                         <span
                           className="w-2.5 h-2.5 rounded-full"
                           style={{ backgroundColor: c.color || '#3b82f6' }}
@@ -420,7 +420,7 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
                         </span>
                       </td>
 
-                      <td className="p-3.5 text-center font-mono tabular-nums text-zinc-300">
+                      <td className="p-3.5 text-center tabular-nums text-zinc-300">
                         {c.credits.toFixed(2)}
                       </td>
 
@@ -428,7 +428,7 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
                         <div className="flex items-center gap-2">
                           <span>{c.teacher || '—'}</span>
                           {c.room && (
-                            <span className="font-mono tabular-nums text-zinc-300 bg-zinc-800 px-1.5 py-0.2 rounded text-[10px] border border-white/10">
+                            <span className="tabular-nums text-zinc-300 bg-zinc-800 px-1.5 py-0.2 rounded text-[10px] border border-white/10">
                               {c.room}
                             </span>
                           )}
@@ -441,7 +441,7 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
                             Ongoing Term
                           </span>
                         ) : (
-                          <div className="font-mono tabular-nums">
+                          <div className="tabular-nums">
                             <span className="font-bold text-zinc-100 text-xs">{c.grade || '—'}</span>
                             <span className="text-zinc-400 text-xs ml-1">
                               ({(c.gradePoint ?? 0).toFixed(2)})
@@ -478,12 +478,12 @@ IPE 208      Engineering Metallurgy Sessional                  0.75      A+     
             </h3>
             <p className="text-zinc-400 text-xs mt-0.5 leading-relaxed">
               No need to copy-paste boring text. Just take a screenshot of your result on{' '}
-              <span className="text-emerald-400 font-mono">biis.buet.ac.bd</span> (
-              <kbd className="px-1 py-0.5 rounded bg-zinc-800 text-[10px] font-mono text-zinc-300">
+              <span className="text-emerald-400 ">biis.buet.ac.bd</span> (
+              <kbd className="px-1 py-0.5 rounded bg-zinc-800 text-[10px] text-zinc-300">
                 Win + Shift + S
               </kbd>
               ) and press{' '}
-              <kbd className="px-1 py-0.5 rounded bg-zinc-800 text-[10px] font-mono text-emerald-300 font-bold">
+              <kbd className="px-1 py-0.5 rounded bg-zinc-800 text-[10px] text-emerald-300 font-bold">
                 Ctrl + V
               </kbd>{' '}
               right here!

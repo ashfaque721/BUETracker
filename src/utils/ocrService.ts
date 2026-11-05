@@ -24,8 +24,23 @@ const GP_TO_GRADE_MAP: Record<number, string> = {
   0.00: 'F',
 };
 
+const GRADE_TO_GP_MAP: Record<string, number> = {
+  'A+': 4.00,
+  'A': 3.75,
+  'A-': 3.50,
+  'B+': 3.25,
+  'B': 3.00,
+  'B-': 2.75,
+  'C+': 2.50,
+  'C': 2.25,
+  'D': 2.00,
+  'F': 0.00,
+  'S': 4.00,
+};
+
 function snapGradePoint(val: number): number {
   const gps = [4.00, 3.75, 3.50, 3.25, 3.00, 2.75, 2.50, 2.25, 2.00, 0.00];
+  if (isNaN(val) || val < 0) return 4.00;
   let closest = gps[0];
   let minDiff = Math.abs(val - closest);
   for (const g of gps) {
@@ -89,26 +104,28 @@ function analyzeGrid(ctx: CanvasRenderingContext2D, width: number, height: numbe
       const b = data[idx + 2];
 
       // BIIS standard red table borders (#c00000 or #990000)
-      const isRedBorder = r > 80 && (r - g) > 20 && (r - b) > 20;
-      if (isRedBorder) {
+      // Red borders have r > 100, g < 80, b < 80
+      const isRedBorder = r > 100 && g < 80 && b < 80;
+      const isDarkBorder = r < 50 && g < 50 && b < 50;
+      if (isRedBorder || isDarkBorder) {
         rowDividerCounts[y]++;
         colDividerCounts[x]++;
       }
     }
   }
 
-  // Find candidate horizontal lines (at least 30% of width)
+  // Find candidate horizontal lines (at least 35% of width)
   const candidateY: number[] = [];
   for (let y = 0; y < height; y++) {
-    if (rowDividerCounts[y] > width * 0.28) {
+    if (rowDividerCounts[y] > width * 0.35) {
       candidateY.push(y);
     }
   }
 
-  // Cluster adjacent lines within 3px
+  // Cluster adjacent lines within 4px
   const yLines: number[] = [];
   for (const y of candidateY) {
-    if (yLines.length === 0 || y > yLines[yLines.length - 1] + 3) {
+    if (yLines.length === 0 || y > yLines[yLines.length - 1] + 4) {
       yLines.push(y);
     }
   }
@@ -116,19 +133,19 @@ function analyzeGrid(ctx: CanvasRenderingContext2D, width: number, height: numbe
   // Find candidate vertical lines (at least 30% of height)
   const candidateX: number[] = [];
   for (let x = 0; x < width; x++) {
-    if (colDividerCounts[x] > height * 0.28) {
+    if (colDividerCounts[x] > height * 0.3) {
       candidateX.push(x);
     }
   }
 
   const xLines: number[] = [];
   for (const x of candidateX) {
-    if (xLines.length === 0 || x > xLines[xLines.length - 1] + 3) {
+    if (xLines.length === 0 || x > xLines[xLines.length - 1] + 4) {
       xLines.push(x);
     }
   }
 
-  // We require at least 3 horizontal lines (Header + at least 1 course row + bottom)
+  // Require at least 3 horizontal lines (Header + at least 1 course row + bottom)
   // and at least 4 vertical lines (Course No, Title, Credits, Grade/GP)
   const hasGrid = yLines.length >= 3 && xLines.length >= 4;
 
@@ -136,7 +153,8 @@ function analyzeGrid(ctx: CanvasRenderingContext2D, width: number, height: numbe
 }
 
 /**
- * Slices a region of a canvas, applies 3x high-DPI scaling and watermark removal
+ * Slices a region of a canvas, applies threshold binarization to eliminate watermarks,
+ * adds white padding, and scales up 3.5x with nearest-neighbor interpolation.
  */
 function sliceAndBinarizeCanvas(
   sourceCanvas: HTMLCanvasElement,
@@ -144,38 +162,70 @@ function sliceAndBinarizeCanvas(
   y: number,
   w: number,
   h: number,
-  scale = 3.0
+  threshold = 115,
+  scale = 3.5
 ): string {
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(10, Math.round(w * scale));
-  canvas.height = Math.max(10, Math.round(h * scale));
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return '';
+  const insetX = Math.min(x + 2, sourceCanvas.width - 1);
+  const insetY = Math.min(y + 2, sourceCanvas.height - 1);
+  const insetW = Math.max(2, Math.min(w - 4, sourceCanvas.width - insetX));
+  const insetH = Math.max(2, Math.min(h - 4, sourceCanvas.height - insetY));
 
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(sourceCanvas, x, y, w, h, 0, 0, canvas.width, canvas.height);
+  const srcCtx = sourceCanvas.getContext('2d');
+  if (!srcCtx) return '';
 
-  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const imgData = srcCtx.getImageData(insetX, insetY, insetW, insetH);
   const data = imgData.data;
+
+  // 1. Native 1x Binary Canvas
+  const binCanvas = document.createElement('canvas');
+  binCanvas.width = insetW;
+  binCanvas.height = insetH;
+  const binCtx = binCanvas.getContext('2d');
+  if (!binCtx) return '';
+
+  const binImgData = binCtx.createImageData(insetW, insetH);
+  const binData = binImgData.data;
 
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i];
     const g = data[i + 1];
     const b = data[i + 2];
 
-    const isRedBorder = r > 80 && (r - g) > 20 && (r - b) > 20;
-    // Pure dark text in BIIS table (r, g, b < 120), eliminating hollow watermark and light background
-    const isDarkText = r < 120 && g < 120 && b < 120 && !isRedBorder;
-
-    const val = isDarkText ? 0 : 255;
-    data[i] = val;
-    data[i + 1] = val;
-    data[i + 2] = val;
+    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+    // Dark text (gray < threshold) becomes black (0), watermark (gray >= 140) and cream background become white (255)
+    const val = gray < threshold ? 0 : 255;
+    binData[i] = val;
+    binData[i + 1] = val;
+    binData[i + 2] = val;
+    binData[i + 3] = 255;
   }
+  binCtx.putImageData(binImgData, 0, 0);
 
-  ctx.putImageData(imgData, 0, 0);
-  return canvas.toDataURL('image/png');
+  // 2. Scaled Canvas with 8px white padding
+  const pad = 8;
+  const targetCanvas = document.createElement('canvas');
+  targetCanvas.width = Math.round((insetW + pad * 2) * scale);
+  targetCanvas.height = Math.round((insetH + pad * 2) * scale);
+  const targetCtx = targetCanvas.getContext('2d');
+  if (!targetCtx) return binCanvas.toDataURL('image/png');
+
+  targetCtx.fillStyle = '#ffffff';
+  targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+
+  targetCtx.imageSmoothingEnabled = false; // Nearest neighbor preserves sharp strokes
+  targetCtx.drawImage(
+    binCanvas,
+    0,
+    0,
+    insetW,
+    insetH,
+    Math.round(pad * scale),
+    Math.round(pad * scale),
+    Math.round(insetW * scale),
+    Math.round(insetH * scale)
+  );
+
+  return targetCanvas.toDataURL('image/png');
 }
 
 /**
@@ -184,7 +234,7 @@ function sliceAndBinarizeCanvas(
 export async function preprocessImage(imageSource: File | Blob | string): Promise<string> {
   const img = await loadImage(imageSource);
   const canvas = document.createElement('canvas');
-  const scale = Math.max(3.5, 2200 / img.naturalWidth);
+  const scale = Math.max(3.0, 2000 / img.naturalWidth);
   canvas.width = Math.round(img.naturalWidth * scale);
   canvas.height = Math.round(img.naturalHeight * scale);
 
@@ -203,13 +253,15 @@ export async function preprocessImage(imageSource: File | Blob | string): Promis
     const g = data[i + 1];
     const b = data[i + 2];
 
-    const isRedBorder = r > 70 && (r - g) > 20 && (r - b) > 20;
-    const isDarkText = r < 120 && g < 120 && b < 120 && !isRedBorder;
+    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+    const isRedBorder = r > 100 && g < 80 && b < 80;
+    const isDarkText = gray < 125 && !isRedBorder;
 
     const val = isDarkText ? 0 : 255;
     data[i] = val;
     data[i + 1] = val;
     data[i + 2] = val;
+    data[i + 3] = 255;
   }
 
   ctx.putImageData(imageData, 0, 0);
@@ -218,7 +270,7 @@ export async function preprocessImage(imageSource: File | Blob | string): Promis
 
 /**
  * Scans a BIIS screenshot using dual-engine approach:
- * 1. High-precision Table Grid Cell Slicing (pixel-perfect row/cell isolation)
+ * 1. High-precision Table Grid Cell Slicing (watermark-immune, individual whitelisted OCR)
  * 2. Adaptive Binarized Full-Table OCR + BUET Ordinance Fuzzy Matcher (Fallback)
  */
 export async function scanBIISScreenshot(
@@ -257,40 +309,67 @@ export async function scanBIISScreenshot(
 
     if (grid.hasGrid && grid.xLines.length >= 5) {
       // STRATEGY 1: Pixel-Perfect Grid Cell / Row Slicing
-      onProgress?.(40, `Found BIIS table grid (${grid.yLines.length - 2} courses detected)...`);
-      await worker.setParameters({ tessedit_pageseg_mode: '7' as any }); // Single line mode
+      const numCourseRows = grid.yLines.length - 2;
+      onProgress?.(40, `Found BIIS table grid (${numCourseRows} courses detected)...`);
 
       const xL = grid.xLines;
       const yL = grid.yLines;
 
       for (let i = 1; i < yL.length - 1; i++) {
-        const yTop = yL[i] + 1;
-        const yBot = yL[i + 1] - 1;
+        const yTop = yL[i];
+        const yBot = yL[i + 1];
         const rowH = yBot - yTop;
         if (rowH < 8) continue;
 
-        const pct = Math.round(40 + (i / (yL.length - 2)) * 45);
-        onProgress?.(pct, `Reading course row ${i} of ${yL.length - 2}...`);
+        const pct = Math.round(40 + (i / numCourseRows) * 45);
+        onProgress?.(pct, `Reading course row ${i} of ${numCourseRows}...`);
 
         // Slice Course No, Title, Credit, Grade, Grade Point
-        const codeSlice = sliceAndBinarizeCanvas(canvas, xL[0] + 1, yTop, xL[1] - xL[0] - 2, rowH);
-        const titleSlice = sliceAndBinarizeCanvas(canvas, xL[1] + 1, yTop, xL[2] - xL[1] - 2, rowH);
-        const creditSlice = sliceAndBinarizeCanvas(canvas, xL[2] + 1, yTop, xL[3] - xL[2] - 2, rowH);
-        const gradeSlice = sliceAndBinarizeCanvas(canvas, xL[3] + 1, yTop, xL[4] - xL[3] - 2, rowH);
-        const gpSlice = sliceAndBinarizeCanvas(canvas, xL[4] + 1, yTop, (xL[5] || canvas.width) - xL[4] - 2, rowH);
+        // Titles have slightly higher threshold (125) for fine lettering; numbers and codes use 115
+        const codeSlice = sliceAndBinarizeCanvas(canvas, xL[0], yTop, xL[1] - xL[0], rowH, 115);
+        const titleSlice = sliceAndBinarizeCanvas(canvas, xL[1], yTop, xL[2] - xL[1], rowH, 125);
+        const creditSlice = sliceAndBinarizeCanvas(canvas, xL[2], yTop, xL[3] - xL[2], rowH, 115);
+        const gradeSlice = sliceAndBinarizeCanvas(canvas, xL[3], yTop, xL[4] - xL[3], rowH, 115);
+        const gpSlice = sliceAndBinarizeCanvas(canvas, xL[4], yTop, (xL[5] || canvas.width) - xL[4], rowH, 115);
 
-        const [codeRet, titleRet, creditRet, gradeRet, gpRet] = await Promise.all([
-          worker.recognize(codeSlice),
-          worker.recognize(titleSlice),
-          worker.recognize(creditSlice),
-          worker.recognize(gradeSlice),
-          worker.recognize(gpSlice),
-        ]);
-
+        // 1. Recognize Course Code (Single Line, Alphabets + Numbers)
+        await worker.setParameters({
+          tessedit_pageseg_mode: '7' as any,
+          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789',
+        });
+        const codeRet = await worker.recognize(codeSlice);
         const rawCode = (codeRet.data.text || '').trim();
-        const rawTitle = (titleRet.data.text || '').trim();
+
+        // 2. Recognize Course Title (Multi-line uniform block PSM 6 for multi-line titles like PHY 117)
+        await worker.setParameters({
+          tessedit_pageseg_mode: '6' as any,
+          tessedit_char_whitelist: '',
+        });
+        const titleRet = await worker.recognize(titleSlice);
+        const rawTitle = (titleRet.data.text || '').replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim();
+
+        // 3. Recognize Credit Hours (Single Line, Digits + Dot)
+        await worker.setParameters({
+          tessedit_pageseg_mode: '7' as any,
+          tessedit_char_whitelist: '0123456789.',
+        });
+        const creditRet = await worker.recognize(creditSlice);
         const rawCredit = (creditRet.data.text || '').trim();
+
+        // 4. Recognize Grade (Single Character / Short Symbol)
+        await worker.setParameters({
+          tessedit_pageseg_mode: '10' as any,
+          tessedit_char_whitelist: 'ABCDF+-S',
+        });
+        const gradeRet = await worker.recognize(gradeSlice);
         const rawGrade = (gradeRet.data.text || '').trim();
+
+        // 5. Recognize Grade Point (Single Line, Digits + Dot)
+        await worker.setParameters({
+          tessedit_pageseg_mode: '7' as any,
+          tessedit_char_whitelist: '0123456789.',
+        });
+        const gpRet = await worker.recognize(gpSlice);
         const rawGp = (gpRet.data.text || '').trim().replace(',', '.');
 
         fullRawText += `${rawCode} | ${rawTitle} | ${rawCredit} | ${rawGrade} | ${rawGp}\n`;
@@ -302,10 +381,18 @@ export async function scanBIISScreenshot(
         const credits = match ? match.credits : snapCredit(parseFloat(rawCredit));
         const type: CourseType = match ? match.type : (credits <= 1.5 ? 'sessional' : 'theory');
 
-        // Parse Grade Point & Grade
+        // Bidirectional Grade & Grade Point Reconciliation:
         const parsedGp = parseFloat(rawGp);
-        const gradePoint = !isNaN(parsedGp) ? snapGradePoint(parsedGp) : 4.00;
-        const grade = GP_TO_GRADE_MAP[gradePoint] || 'A+';
+        let gradePoint = 4.00;
+        let grade = 'A+';
+
+        if (!isNaN(parsedGp) && parsedGp >= 0 && parsedGp <= 4.00) {
+          gradePoint = snapGradePoint(parsedGp);
+          grade = GP_TO_GRADE_MAP[gradePoint] || 'A+';
+        } else if (rawGrade && GRADE_TO_GP_MAP[rawGrade.toUpperCase()]) {
+          grade = rawGrade.toUpperCase();
+          gradePoint = GRADE_TO_GP_MAP[grade];
+        }
 
         courses.push({
           code,
@@ -321,11 +408,19 @@ export async function scanBIISScreenshot(
       if (yL.length > 0) {
         const botY = yL[yL.length - 1] + 1;
         const botH = canvas.height - botY;
-        if (botH > 10) {
-          const footerSlice = sliceAndBinarizeCanvas(canvas, 0, botY, canvas.width, botH);
+        if (botH > 8) {
+          // Footer right-side has GPA (x > 60% of width)
+          const footerStartX = Math.round(canvas.width * 0.60);
+          const footerW = canvas.width - footerStartX;
+          const footerSlice = sliceAndBinarizeCanvas(canvas, footerStartX, botY, footerW, botH, 115);
+
+          await worker.setParameters({
+            tessedit_pageseg_mode: '7' as any,
+            tessedit_char_whitelist: 'GPA: 0123456789.',
+          });
           const footerRet = await worker.recognize(footerSlice);
           fullRawText += `\nFooter: ${footerRet.data.text}\n`;
-          const gpaMatch = footerRet.data.text.match(/GPA[:\s]+([0-4]\.\d{2})/i);
+          const gpaMatch = footerRet.data.text.match(/GPA[:\s]+([0-4]\.\d{2})/i) || footerRet.data.text.match(/([0-4]\.\d{2})/);
           if (gpaMatch) {
             detectedGpa = parseFloat(gpaMatch[1]);
           }

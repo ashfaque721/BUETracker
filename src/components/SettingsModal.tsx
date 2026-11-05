@@ -138,7 +138,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     type="text"
                     value={studentId}
                     onChange={(e) => setStudentId(e.target.value)}
-                    className="w-full bg-zinc-900 border border-white/[0.08] rounded-xl px-3 py-2 text-zinc-100 font-mono tabular-nums focus:outline-none focus:border-emerald-500 transition"
+                    className="w-full bg-zinc-900 border border-white/[0.08] rounded-xl px-3 py-2 text-zinc-100 tabular-nums focus:outline-none focus:border-emerald-500 transition"
                   />
                 </div>
               </div>
@@ -160,7 +160,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     step="0.5"
                     value={degreeCredits}
                     onChange={(e) => setDegreeCredits(parseFloat(e.target.value) || 160)}
-                    className="w-full bg-zinc-900 border border-white/[0.08] rounded-xl px-3 py-2 text-zinc-100 font-mono tabular-nums focus:outline-none focus:border-emerald-500 transition"
+                    className="w-full bg-zinc-900 border border-white/[0.08] rounded-xl px-3 py-2 text-zinc-100 tabular-nums focus:outline-none focus:border-emerald-500 transition"
                   />
                 </div>
               </div>
@@ -262,35 +262,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-900 border border-white/[0.06]">
                 <span className="text-zinc-300 font-medium">Save & Local Sync</span>
-                <kbd className="px-2 py-1 rounded bg-zinc-800 text-blue-400 font-mono tabular-nums text-xs border border-white/10">
+                <kbd className="px-2 py-1 rounded bg-zinc-800 text-blue-400 tabular-nums text-xs border border-white/10">
                   Ctrl + S
                 </kbd>
               </div>
 
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-900 border border-white/[0.06]">
                 <span className="text-zinc-300 font-medium">Routine Designer & Exporter</span>
-                <kbd className="px-2 py-1 rounded bg-zinc-800 text-blue-400 font-mono tabular-nums text-xs border border-white/10">
+                <kbd className="px-2 py-1 rounded bg-zinc-800 text-blue-400 tabular-nums text-xs border border-white/10">
                   Ctrl + E
                 </kbd>
               </div>
 
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-900 border border-white/[0.06]">
                 <span className="text-zinc-300 font-medium">Print Routine (Document View)</span>
-                <kbd className="px-2 py-1 rounded bg-zinc-800 text-blue-400 font-mono tabular-nums text-xs border border-white/10">
+                <kbd className="px-2 py-1 rounded bg-zinc-800 text-blue-400 tabular-nums text-xs border border-white/10">
                   Ctrl + P
                 </kbd>
               </div>
 
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-900 border border-white/[0.06]">
                 <span className="text-zinc-300 font-medium">Toggle Fullscreen</span>
-                <kbd className="px-2 py-1 rounded bg-zinc-800 text-blue-400 font-mono tabular-nums text-xs border border-white/10">
+                <kbd className="px-2 py-1 rounded bg-zinc-800 text-blue-400 tabular-nums text-xs border border-white/10">
                   F11
                 </kbd>
               </div>
 
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-900 border border-white/[0.06]">
                 <span className="text-zinc-300 font-medium">Close Modal / Esc</span>
-                <kbd className="px-2 py-1 rounded bg-zinc-800 text-zinc-300 font-mono tabular-nums text-xs border border-white/10">
+                <kbd className="px-2 py-1 rounded bg-zinc-800 text-zinc-300 tabular-nums text-xs border border-white/10">
                   Escape
                 </kbd>
               </div>

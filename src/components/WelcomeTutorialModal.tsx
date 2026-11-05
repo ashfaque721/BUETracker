@@ -109,7 +109,7 @@ export const WelcomeTutorialModal: React.FC<WelcomeTutorialModalProps> = ({
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
               <span>Full offline local SQLite / IndexedDB persistence.</span>
             </span>
-            <span className="text-emerald-400 font-semibold font-mono tabular-nums">100% Offline</span>
+            <span className="text-emerald-400 font-semibold tabular-nums">100% Offline</span>
           </div>
         </div>
       ),
@@ -202,7 +202,7 @@ export const WelcomeTutorialModal: React.FC<WelcomeTutorialModalProps> = ({
             <div className="p-3 rounded-xl bg-zinc-900 border border-white/[0.08]">
               <strong className="text-zinc-100 block mb-0.5">BIIS Result Sheet Auto-Parser</strong>
               <span className="text-zinc-400 text-xs">
-                Copy and paste your tabular result from <code className="text-emerald-400 font-mono tabular-nums">biis.buet.ac.bd</code> or drop a screenshot. Course codes, credits, and grades are parsed instantly!
+                Copy and paste your tabular result from <code className="text-emerald-400 tabular-nums">biis.buet.ac.bd</code> or drop a screenshot. Course codes, credits, and grades are parsed instantly!
               </span>
             </div>
 
@@ -283,7 +283,7 @@ export const WelcomeTutorialModal: React.FC<WelcomeTutorialModalProps> = ({
               />
             ))}
           </div>
-          <span className="text-[11px] font-mono tabular-nums text-zinc-400 font-semibold">
+          <span className="text-[11px] tabular-nums text-zinc-400 font-semibold">
             Step {currentStep + 1} of {steps.length}
           </span>
         </div>

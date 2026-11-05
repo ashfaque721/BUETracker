@@ -38,16 +38,16 @@ import jsPDF from 'jspdf';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'routine' | 'assessment' | 'courses' | 'analytics'>('routine');
-  const [courses, setCourses] = useState<Course[]>(SEED_COURSES);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [routine, setRoutine] = useState<RoutineMetadata>(SEED_ROUTINE);
   const [settings, setSettings] = useState<UserSettings>({
-    studentName: 'Ashfaque Amin Eshan',
-    studentId: '2308001',
-    department: "Industrial & Production Engineering (IPE '23)",
+    studentName: '',
+    studentId: '',
+    department: 'Industrial & Production Engineering (IPE)',
     totalDegreeCredits: 160,
-    currentSemesterId: 'L2T1',
+    currentSemesterId: 'L1T1',
     theme: 'dark',
-    isOnboarded: true,
+    isOnboarded: false,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -160,7 +160,7 @@ export function App() {
         if (allCourses.length > 0) {
           setCourses(allCourses);
         } else {
-          setCourses(SEED_COURSES);
+          setCourses([]);
         }
         if (allRoutines.length > 0 && allRoutines[0].slots && allRoutines[0].slots.length > 0) {
           setRoutine(allRoutines[0]);
@@ -168,23 +168,18 @@ export function App() {
           setRoutine(SEED_ROUTINE);
         }
       } else {
-        // Preload authentic BUET IPE '23 Level-2 Term-1 mock data
-        const defaultSettings: UserSettings = {
-          studentName: 'Ashfaque Amin Eshan',
-          studentId: '2308001',
-          department: "Industrial & Production Engineering (IPE '23)",
+        // First run: Do NOT preload dummy data! Show onboarding wizard
+        const initialSetupSettings: UserSettings = {
+          studentName: '',
+          studentId: '',
+          department: 'Industrial & Production Engineering (IPE)',
           totalDegreeCredits: 160,
-          currentSemesterId: 'L2T1',
+          currentSemesterId: 'L1T1',
           theme: 'dark',
-          isOnboarded: true,
+          isOnboarded: false,
         };
-        await db.settings.put({ id: 'primary_settings', ...defaultSettings });
-        await db.courses.bulkPut(SEED_COURSES);
-        await db.routines.put(SEED_ROUTINE);
-
-        setSettings(defaultSettings);
-        setCourses(SEED_COURSES);
-        setRoutine(SEED_ROUTINE);
+        setSettings(initialSetupSettings);
+        setCourses([]);
       }
     } catch (err) {
       console.error('Failed to load DB:', err);
@@ -256,14 +251,12 @@ export function App() {
       setSettings(newSettings);
       setCourses(initialCourses);
       setRoutine(initialRoutine);
-
-      // Smart navigation: If user imported only previous completed courses, take them to courses tab
-      const hasOngoing = initialCourses.some((c) => c.isOngoing);
-      if (!hasOngoing && initialCourses.length > 0) {
-        setActiveTab('courses');
-      } else {
-        setActiveTab('routine');
+      if (initialRoutine.title) {
+        setTitleText(initialRoutine.title);
       }
+
+      // Always land on the Routine Timetable View
+      setActiveTab('routine');
 
       const firstName = newSettings.studentName?.trim().split(' ')[0] || 'Student';
       showToast(`Welcome, ${firstName}! Your workspace is ready.`);
@@ -408,7 +401,7 @@ export function App() {
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
               BUETTracker
             </h1>
-            <p className="text-xs text-zinc-400 font-mono mt-1 tabular-nums">
+            <p className="text-xs text-zinc-400 mt-1 tabular-nums">
               {deptShort} • {termShort}
             </p>
           </div>
@@ -451,7 +444,7 @@ export function App() {
               <span className="text-xs font-medium text-zinc-200 block truncate">
                 {settings.studentName?.split(' ')[0] || 'Ashfaque'}
               </span>
-              <span className="text-[10px] font-mono text-zinc-500 block truncate tabular-nums">
+              <span className="text-[10px] text-zinc-500 block truncate tabular-nums">
                 {overallCgpa.gpa.toFixed(2)} CGPA
               </span>
             </div>

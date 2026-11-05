@@ -469,7 +469,7 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
           <span className="text-xs font-semibold tracking-tight text-zinc-100">
             BUET Tracker
           </span>
-          <span className="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.06] text-[11px] font-mono tabular-nums text-zinc-400">
+          <span className="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.06] text-[11px] tabular-nums text-zinc-400">
             IPE '23 • L-2 T-1
           </span>
         </div>
@@ -627,7 +627,7 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
               <thead>
                 <tr className="border-b border-white/[0.06] bg-[#0d0e11]">
                   <th className="w-16 p-2.5 text-center border-r border-white/[0.06]">
-                    <span className="text-xs font-mono font-semibold text-zinc-400 uppercase tracking-wider block">
+                    <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">
                       Day
                     </span>
                   </th>
@@ -639,10 +639,10 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
                         className="p-2.5 border-r border-white/[0.06] w-[12%] text-center"
                       >
                         <div className="flex flex-col items-center justify-center text-center">
-                          <span className="text-xs font-semibold text-zinc-200">
+                          <span className="text-xs font-semibold text-zinc-300">
                             {p.name}
                           </span>
-                          <span className="text-[11px] font-mono tabular-nums text-zinc-400 mt-0.5">
+                          <span className="text-xs text-zinc-400 font-normal tabular-nums mt-0.5">
                             {p.timeRange}
                           </span>
                         </div>
@@ -651,20 +651,20 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
                   })}
                   <th className="w-14 p-2 text-center border-r border-white/[0.06] bg-zinc-950/40">
                     <div className="flex flex-col items-center justify-center text-center">
-                      <span className="text-[10px] font-mono tracking-widest text-amber-500/80 font-bold block">
+                      <span className="text-[10px] tracking-widest text-amber-500/80 font-bold block">
                         RECESS
                       </span>
-                      <span className="text-[9px] font-mono text-zinc-400 block mt-0.5 tabular-nums">
+                      <span className="text-xs text-zinc-400 font-normal tabular-nums block mt-0.5">
                         1:30 - 2:30
                       </span>
                     </div>
                   </th>
                   <th className="p-2.5 w-52 text-center">
                     <div className="flex flex-col items-center justify-center text-center">
-                      <span className="text-xs font-semibold text-zinc-200">
+                      <span className="text-xs font-semibold text-zinc-300">
                         Period 7 (Lab)
                       </span>
-                      <span className="text-[11px] font-mono tabular-nums text-zinc-400 mt-0.5">
+                      <span className="text-xs text-zinc-400 font-normal tabular-nums mt-0.5">
                         2:30 - 5:00
                       </span>
                     </div>
@@ -681,7 +681,7 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
                     <tr key={day} className="h-28">
                       {/* Day Label Cell */}
                       <td className="w-16 p-2.5 text-center bg-[#0d0e11] select-none border-r border-white/[0.06] align-middle">
-                        <span className="text-sm font-bold font-mono tracking-wider text-zinc-200 block uppercase">
+                        <span className="text-sm font-bold tracking-wider text-zinc-200 block uppercase">
                           {day.slice(0, 3)}
                         </span>
                       </td>
@@ -723,19 +723,18 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
                                 }`}
                               >
                                 {/* Line 1: Course Code */}
-                                <span className="text-sm font-semibold tracking-tight text-white block">
+                                <span className="text-white font-semibold text-sm block">
                                   {slot.code}
                                 </span>
 
                                 {/* Line 2: Course Nickname */}
-                                <span className="text-xs font-medium text-zinc-300 mt-0.5 block truncate max-w-full">
+                                <span className="text-zinc-300 text-xs mt-0.5 block truncate max-w-full font-normal">
                                   {slot.nickname}
                                 </span>
 
-                                {/* Line 3: Instructor & Room Tag */}
-                                <span className="text-[11px] font-mono text-zinc-400 mt-1 block truncate max-w-full">
+                                {/* Line 3: Instructor (NO room strings!) */}
+                                <span className="text-zinc-400 text-xs mt-1 block truncate max-w-full font-normal">
                                   {slot.teacher || 'TBA'}
-                                  {slot.room && ` • ${slot.room.replace(/^Room:\s*/i, '')}`}
                                 </span>
                               </div>
                             ) : (
@@ -755,10 +754,10 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
                           className="w-14 border-r border-white/[0.06] text-center bg-zinc-950/50 select-none p-2 align-middle"
                         >
                           <div className="h-full min-h-[520px] flex flex-col items-center justify-center gap-4">
-                            <span className="text-[10px] font-mono font-semibold tracking-[0.25em] text-amber-500/80 [writing-mode:vertical-rl] rotate-180 uppercase select-none">
+                            <span className="text-[10px] font-semibold tracking-[0.25em] text-amber-500/80 [writing-mode:vertical-rl] rotate-180 uppercase select-none">
                               PRAYER & LUNCH BREAK
                             </span>
-                            <span className="text-[9px] font-mono text-zinc-400 [writing-mode:vertical-rl] rotate-180 tabular-nums">
+                            <span className="text-xs text-zinc-400 [writing-mode:vertical-rl] rotate-180 tabular-nums">
                               1:30 — 2:30 PM
                             </span>
                           </div>
@@ -779,15 +778,14 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
                           >
                             {slot ? (
                               <div className="h-full min-h-[96px] rounded-xl border border-violet-500/30 border-l-[3px] border-l-violet-400 bg-zinc-900/90 hover:border-white/[0.14] transition-all flex flex-col items-center justify-center text-center p-2.5 cursor-pointer relative">
-                                <span className="text-sm font-semibold tracking-tight text-white block">
+                                <span className="text-white font-semibold text-sm block">
                                   {slot.code}
                                 </span>
-                                <span className="text-xs font-medium text-zinc-300 mt-0.5 block truncate max-w-full">
+                                <span className="text-zinc-300 text-xs mt-0.5 block truncate max-w-full font-normal">
                                   {slot.nickname}
                                 </span>
-                                <span className="text-[11px] font-mono text-zinc-400 mt-1 block truncate max-w-full">
+                                <span className="text-zinc-400 text-xs mt-1 block truncate max-w-full font-normal">
                                   {slot.teacher || 'Lab Instructors'}
-                                  {slot.room && ` • ${slot.room.replace(/^Room:\s*/i, '')}`}
                                 </span>
                               </div>
                             ) : (
@@ -818,7 +816,7 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
                 <h3 className="text-xs font-semibold text-zinc-100">
                   {editingCell.existingSlot ? 'Edit Class Slot' : 'Add Class'}
                 </h3>
-                <p className="text-[11px] text-zinc-400 font-mono mt-0.5">
+                <p className="text-[11px] text-zinc-400 mt-0.5">
                   {editingCell.day} • {editingCell.periodId === 7 ? 'Period 7 (Lab)' : `Period ${editingCell.periodId}`}
                 </p>
               </div>
@@ -843,7 +841,7 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
                   placeholder="e.g. ME 243 or IPE 205"
                   value={formCode}
                   onChange={(e) => setFormCode(e.target.value.toUpperCase())}
-                  className="w-full bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-1.5 text-zinc-100 font-mono uppercase focus:outline-none focus:border-white/20 transition-colors"
+                  className="w-full bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-1.5 text-zinc-100 uppercase focus:outline-none focus:border-white/20 transition-colors"
                 />
               </div>
 
@@ -932,7 +930,7 @@ export const ClassRoutineView: React.FC<ClassRoutineViewProps> = ({
                         key={s}
                         type="button"
                         onClick={() => setFormSpan(s)}
-                        className={`flex-1 py-1 rounded-lg border text-xs font-mono transition-colors ${
+                        className={`flex-1 py-1 rounded-lg border text-xs transition-colors ${
                           formSpan === s
                             ? 'bg-white/[0.1] text-zinc-100 border-white/20 font-semibold'
                             : 'bg-white/[0.02] text-zinc-400 border-white/[0.06] hover:bg-white/[0.04]'

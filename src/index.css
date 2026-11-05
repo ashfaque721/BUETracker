@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
 /* Keyframe animations */
@@ -61,10 +61,8 @@
     font-family: inherit;
   }
 
-  /* Monospace & tabular numbers */
-  .font-mono,
+  /* Tabular numbers for numbers alignment using sans-serif font */
   .tabular-nums {
-    font-family: 'JetBrains Mono', monospace;
     font-variant-numeric: tabular-nums;
   }
 }

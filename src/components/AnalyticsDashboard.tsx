@@ -170,10 +170,10 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white tracking-tight font-mono tabular-nums">
+            <span className="text-3xl font-extrabold text-white tracking-tight tabular-nums">
               {currentCGPA}
             </span>
-            <span className="text-xs text-zinc-400 font-mono tabular-nums">/ 4.00</span>
+            <span className="text-xs text-zinc-400 tabular-nums">/ 4.00</span>
           </div>
           <div className="flex items-center gap-1.5 text-xs">
             {Number(currentCGPA) >= 3.75 ? (
@@ -195,10 +195,10 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white tracking-tight font-mono tabular-nums">
+            <span className="text-3xl font-extrabold text-white tracking-tight tabular-nums">
               {completedCreditsTotal.toFixed(1)}
             </span>
-            <span className="text-xs text-zinc-400 font-mono tabular-nums">/ {totalRequired} cr</span>
+            <span className="text-xs text-zinc-400 tabular-nums">/ {totalRequired} cr</span>
           </div>
           <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
             <div
@@ -217,10 +217,10 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white tracking-tight font-mono tabular-nums">
+            <span className="text-3xl font-extrabold text-white tracking-tight tabular-nums">
               {overallCtMean}%
             </span>
-            <span className="text-xs text-zinc-400 font-mono tabular-nums">across theory</span>
+            <span className="text-xs text-zinc-400 tabular-nums">across theory</span>
           </div>
           <div className="text-xs text-zinc-400 font-medium">
             {ongoingTheoryCourses.length} registered theory courses
@@ -236,10 +236,10 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white tracking-tight font-mono tabular-nums">
+            <span className="text-3xl font-extrabold text-white tracking-tight tabular-nums">
               {attendanceData.filter((a) => !a.isNonCollegiate).length} / {attendanceData.length}
             </span>
-            <span className="text-xs text-zinc-400 font-mono tabular-nums">Collegiate</span>
+            <span className="text-xs text-zinc-400 tabular-nums">Collegiate</span>
           </div>
           <div className="text-xs text-emerald-400 font-medium">
             0 Debarred / Non-Collegiate
@@ -258,7 +258,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                 CGPA Progression Curve
               </h3>
             </div>
-            <div className="flex items-center gap-3 text-xs font-mono tabular-nums">
+            <div className="flex items-center gap-3 text-xs tabular-nums">
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
                 <span className="text-zinc-200">Cumulative CGPA</span>
@@ -327,20 +327,20 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                 Projected CGPA Simulator
               </h3>
             </div>
-            <span className="text-xs text-zinc-400 font-mono tabular-nums">
+            <span className="text-xs text-zinc-400 tabular-nums">
               {settings.currentSemesterId}
             </span>
           </div>
 
           <div className="space-y-4">
             <p className="text-xs text-zinc-300 leading-relaxed">
-              Drag the slider to test hypothetical grade outcomes for your ongoing <span className="font-mono tabular-nums font-bold text-zinc-100">{ongoingCreditsTotal}</span> registered credits.
+              Drag the slider to test hypothetical grade outcomes for your ongoing <span className="tabular-nums font-bold text-zinc-100">{ongoingCreditsTotal}</span> registered credits.
             </p>
 
             <div className="p-4 rounded-xl bg-zinc-900 border border-white/[0.08] space-y-3">
               <div className="flex justify-between items-baseline">
                 <span className="text-xs text-zinc-300 font-medium">Target Term GPA</span>
-                <span className="text-2xl font-bold font-mono tabular-nums text-purple-400">
+                <span className="text-2xl font-bold tabular-nums text-purple-400">
                   {simulatedTermGpa.toFixed(2)}
                 </span>
               </div>
@@ -355,7 +355,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                 className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
               />
 
-              <div className="flex justify-between text-[11px] text-zinc-400 font-mono tabular-nums">
+              <div className="flex justify-between text-[11px] text-zinc-400 tabular-nums">
                 <span>2.00</span>
                 <span>3.00</span>
                 <span>3.75 (Honours)</span>
@@ -372,7 +372,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                   After current {ongoingCreditsTotal} cr completed
                 </span>
               </div>
-              <div className="text-3xl font-extrabold font-mono tabular-nums text-white">
+              <div className="text-3xl font-extrabold tabular-nums text-white">
                 {simulatedCGPA}
               </div>
             </div>
@@ -437,10 +437,10 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
               <div key={att.courseCode} className="space-y-1 text-xs">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono tabular-nums font-bold text-zinc-100">{att.courseCode}</span>
+                    <span className="tabular-nums font-bold text-zinc-100">{att.courseCode}</span>
                     <span className="text-zinc-400 text-xs truncate max-w-[160px]">{att.title}</span>
                   </div>
-                  <div className="flex items-center gap-2 font-mono tabular-nums">
+                  <div className="flex items-center gap-2 tabular-nums">
                     <span className="font-bold text-zinc-100">{att.percentage}%</span>
                     <span className="text-zinc-400 text-xs">
                       ({att.safeBunksTo60} safe bunks)

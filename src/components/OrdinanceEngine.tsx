@@ -197,8 +197,8 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                   className="w-2.5 h-2.5 rounded-full"
                   style={{ backgroundColor: c.color || '#3b82f6' }}
                 />
-                <span className="font-mono tabular-nums font-bold">{c.code}</span>
-                <span className="text-xs text-zinc-400 font-mono tabular-nums font-normal">
+                <span className="tabular-nums font-bold">{c.code}</span>
+                <span className="text-xs text-zinc-400 tabular-nums font-normal">
                   {c.credits}cr • {cAss.attendance.percentage}%
                 </span>
               </button>
@@ -250,13 +250,13 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                       </div>
                     </div>
                     <p className="text-xs text-zinc-400 font-medium">
-                      Total Marks: <span className="font-mono tabular-nums text-zinc-300">{assessment.attendance.maxAttendanceMarks.toFixed(1)}</span> ({selectedCourse.credits} cr × 10)
+                      Total Marks: <span className="tabular-nums text-zinc-300">{assessment.attendance.maxAttendanceMarks.toFixed(1)}</span> ({selectedCourse.credits} cr × 10)
                     </p>
                   </div>
                 </div>
 
                 {/* Friendly Status Pill */}
-                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-xl bg-zinc-900 border border-white/[0.08] text-xs font-mono tabular-nums">
+                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-xl bg-zinc-900 border border-white/[0.08] text-xs tabular-nums">
                   <span className="text-emerald-400 font-bold">
                     {assessment.attendance.percentage}% ({assessment.attendance.slabPoints}/10)
                   </span>
@@ -271,7 +271,7 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
               <div className="space-y-2">
                 <div className="flex justify-between items-baseline text-xs">
                   <span className="text-zinc-300 font-medium">Class Attendance Ratio</span>
-                  <div className="flex items-baseline gap-2 font-mono tabular-nums">
+                  <div className="flex items-baseline gap-2 tabular-nums">
                     <span className="text-2xl font-bold text-white tracking-tight">
                       {assessment.attendance.percentage}%
                     </span>
@@ -302,7 +302,7 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                   />
                 </div>
 
-                <div className="flex justify-between text-[11px] text-zinc-400 font-mono tabular-nums pt-0.5">
+                <div className="flex justify-between text-[11px] text-zinc-400 tabular-nums pt-0.5">
                   <span>0%</span>
                   <span className="text-rose-400 font-medium">60% Danger Line</span>
                   <span className="text-emerald-400 font-medium">90% Full Marks</span>
@@ -325,7 +325,7 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                 <div className="p-3.5 rounded-xl bg-zinc-900 border border-white/[0.08]">
                   <span className="text-xs text-zinc-400 block font-medium">Safe Bunks Buffer</span>
                   <div className="flex items-baseline gap-1.5 mt-1">
-                    <span className={`text-2xl font-bold font-mono tabular-nums ${
+                    <span className={`text-2xl font-bold tabular-nums ${
                       assessment.attendance.safeBunksTo60 > 5 ? 'text-emerald-400' : 'text-amber-400'
                     }`}>
                       {assessment.attendance.safeBunksTo60}
@@ -340,7 +340,7 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                 <div className="p-3.5 rounded-xl bg-zinc-900 border border-white/[0.08]">
                   <span className="text-xs text-zinc-400 block font-medium">Classes to Next Slab</span>
                   <div className="flex items-baseline gap-1.5 mt-1">
-                    <span className="text-2xl font-bold font-mono tabular-nums text-blue-400">
+                    <span className="text-2xl font-bold tabular-nums text-blue-400">
                       {assessment.attendance.classesNeededForNextSlab}
                     </span>
                     <span className="text-xs text-zinc-400 font-normal">classes</span>
@@ -409,16 +409,16 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                       </div>
                     </div>
                     <p className="text-xs text-zinc-400 font-medium">
-                      Best <span className="font-mono tabular-nums text-zinc-300">{assessment.classTests.bestCount}</span> of <span className="font-mono tabular-nums text-zinc-300">{assessment.classTests.tests.length}</span> tests counted ({selectedCourse.credits} cr × 20)
+                      Best <span className="tabular-nums text-zinc-300">{assessment.classTests.bestCount}</span> of <span className="tabular-nums text-zinc-300">{assessment.classTests.tests.length}</span> tests counted ({selectedCourse.credits} cr × 20)
                     </p>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <div className="text-sm font-bold font-mono tabular-nums text-blue-400">
+                  <div className="text-sm font-bold tabular-nums text-blue-400">
                     {assessment.classTests.totalCTMarks.toFixed(1)} / {assessment.classTests.maxCTMarks.toFixed(1)}
                   </div>
-                  <div className="text-[11px] text-zinc-400 font-mono tabular-nums">
+                  <div className="text-[11px] text-zinc-400 tabular-nums">
                     {assessment.classTests.ctPercentage.toFixed(1)}% Mean
                   </div>
                 </div>
@@ -441,7 +441,7 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                       }`}
                     >
                       <div className="flex items-center gap-2.5">
-                        <span className="font-mono tabular-nums font-bold text-zinc-100">{test.name}</span>
+                        <span className="tabular-nums font-bold text-zinc-100">{test.name}</span>
                         {test.isCounted ? (
                           <span className="text-[9px] px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-300 border border-emerald-800/70 font-semibold">
                             ✓ Counted
@@ -451,13 +451,13 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                             Dropped
                           </span>
                         )}
-                        <span className="text-xs text-zinc-400 font-mono tabular-nums">
+                        <span className="text-xs text-zinc-400 tabular-nums">
                           ({test.obtainedMarks}/{test.maxMarks})
                         </span>
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <span className="font-mono tabular-nums text-blue-300 font-bold">
+                        <span className="tabular-nums text-blue-300 font-bold">
                           {test.normalizedScore.toFixed(1)}/20
                         </span>
                         <button
@@ -494,7 +494,7 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                       value={newCTObtained}
                       onChange={(e) => setNewCTObtained(e.target.value)}
                       required
-                      className="bg-zinc-800 border border-white/[0.08] rounded-xl px-3 py-1.5 text-zinc-100 font-mono tabular-nums focus:outline-none focus:border-blue-500"
+                      className="bg-zinc-800 border border-white/[0.08] rounded-xl px-3 py-1.5 text-zinc-100 tabular-nums focus:outline-none focus:border-blue-500"
                     />
                     <input
                       type="number"
@@ -503,7 +503,7 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                       value={newCTMax}
                       onChange={(e) => setNewCTMax(e.target.value)}
                       required
-                      className="bg-zinc-800 border border-white/[0.08] rounded-xl px-3 py-1.5 text-zinc-100 font-mono tabular-nums focus:outline-none focus:border-blue-500"
+                      className="bg-zinc-800 border border-white/[0.08] rounded-xl px-3 py-1.5 text-zinc-100 tabular-nums focus:outline-none focus:border-blue-500"
                     />
                   </div>
 
@@ -548,14 +548,14 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                       Term Final Target Calculator
                     </h3>
                     <p className="text-xs text-zinc-400 font-medium">
-                      Continuous secured: <span className="font-mono tabular-nums text-zinc-300">{assessment.continuousMarksObtained.toFixed(1)}</span> / {assessment.maxContinuousMarks.toFixed(1)} (30% weight)
+                      Continuous secured: <span className="tabular-nums text-zinc-300">{assessment.continuousMarksObtained.toFixed(1)}</span> / {assessment.maxContinuousMarks.toFixed(1)} (30% weight)
                     </p>
                   </div>
                 </div>
 
                 <div className="text-right">
                   <div className="text-xs text-zinc-400 font-medium">Exam Weight</div>
-                  <div className="text-sm font-bold font-mono tabular-nums text-amber-400">
+                  <div className="text-sm font-bold tabular-nums text-amber-400">
                     70% ({assessment.maxTFMarks.toFixed(0)} Marks)
                   </div>
                 </div>
@@ -583,7 +583,7 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                       }`}
                     >
                       <span className="text-xs font-bold">{t.grade}</span>
-                      <span className="text-[10px] font-mono tabular-nums opacity-80">
+                      <span className="text-[10px] tabular-nums opacity-80">
                         {t.minPercentage}%
                       </span>
                     </button>
@@ -598,7 +598,7 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                     <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
                       Target: {activeTargetRow.grade} ({activeTargetRow.gradePoint.toFixed(2)} GP)
                     </span>
-                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold font-mono tabular-nums ${
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold tabular-nums ${
                       activeTargetRow.status === 'secured'
                         ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
                         : activeTargetRow.status === 'achievable'
@@ -613,7 +613,7 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
 
                   <div>
                     <div className="text-xs text-zinc-400 font-medium">You need in the Term Final Exam:</div>
-                    <div className="text-2xl sm:text-3xl font-extrabold text-white font-mono tabular-nums tracking-tight mt-1">
+                    <div className="text-2xl sm:text-3xl font-extrabold text-white tabular-nums tracking-tight mt-1">
                       {activeTargetRow.requiredTFMarks.toFixed(1)} / {activeTargetRow.maxTFMarks.toFixed(0)}{' '}
                       <span className="text-lg font-semibold text-emerald-400">
                         ({activeTargetRow.requiredTFPercentage.toFixed(1)}%)
@@ -624,7 +624,7 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                   {/* 50/50 Section A and Section B Split */}
                   <div className="p-3 rounded-xl bg-zinc-950/70 border border-white/[0.06] flex items-center justify-between text-xs">
                     <span className="text-zinc-400 font-medium">BUET 50/50 Section Split:</span>
-                    <div className="flex items-center gap-2 font-mono tabular-nums font-bold text-amber-300">
+                    <div className="flex items-center gap-2 tabular-nums font-bold text-amber-300">
                       <span>~{activeTargetRow.targetSectionA.toFixed(1)} in Sec A</span>
                       <span>+</span>
                       <span>~{activeTargetRow.targetSectionB.toFixed(1)} in Sec B</span>
@@ -645,7 +645,7 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                       <th className="pb-2.5 text-right">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/[0.04] font-mono tabular-nums">
+                  <tbody className="divide-y divide-white/[0.04] tabular-nums">
                     {assessment.tfTargets.map((target) => (
                       <tr
                         key={target.grade}
@@ -656,7 +656,7 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                       >
                         <td className="py-2.5 font-sans">
                           <span className="font-bold text-zinc-100 text-xs">{target.grade}</span>
-                          <span className="text-xs text-zinc-400 ml-1.5 font-mono tabular-nums">({target.gradePoint.toFixed(2)})</span>
+                          <span className="text-xs text-zinc-400 ml-1.5 tabular-nums">({target.gradePoint.toFixed(2)})</span>
                         </td>
 
                         <td className="py-2.5 text-center font-bold text-zinc-100">
@@ -713,7 +713,7 @@ export const OrdinanceEngine: React.FC<OrdinanceEngineProps> = ({
                   <th className="pb-2 text-right">Awarded</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/[0.04] font-mono tabular-nums text-xs">
+              <tbody className="divide-y divide-white/[0.04] tabular-nums text-xs">
                 {BUET_SLABS.map((s) => (
                   <tr key={s.range}>
                     <td className="py-2 text-zinc-100 font-medium font-sans">{s.range}</td>

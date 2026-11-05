@@ -149,7 +149,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
               <tr className="border-b border-white/[0.06] bg-[#0d0e11]">
                 {/* Day Header (SAT..WED) */}
                 <th className="w-16 p-2.5 text-center border-r border-white/[0.06]">
-                  <span className="text-xs font-mono font-semibold text-zinc-400 uppercase tracking-wider block">
+                  <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">
                     Day
                   </span>
                 </th>
@@ -161,10 +161,10 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                     className="p-2.5 border-r border-white/[0.06] w-[12%] text-center"
                   >
                     <div className="flex flex-col items-center justify-center text-center">
-                      <span className="text-xs font-semibold text-zinc-200">
+                      <span className="text-xs font-semibold text-zinc-300">
                         {p.name}
                       </span>
-                      <span className="text-[11px] font-mono tabular-nums text-zinc-400 mt-0.5">
+                      <span className="text-xs text-zinc-400 font-normal tabular-nums mt-0.5">
                         {p.timeRange}
                       </span>
                     </div>
@@ -174,10 +174,10 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                 {/* Continuous Recess Header */}
                 <th className="w-14 p-2 text-center border-r border-white/[0.06] bg-zinc-950/40">
                   <div className="flex flex-col items-center justify-center text-center">
-                    <span className="text-[10px] font-mono tracking-widest text-amber-500/80 font-bold block">
+                    <span className="text-[10px] tracking-widest text-amber-500/80 font-bold block">
                       RECESS
                     </span>
-                    <span className="text-[9px] font-mono text-zinc-400 block mt-0.5 tabular-nums">
+                    <span className="text-xs text-zinc-400 font-normal tabular-nums block mt-0.5">
                       1:30 - 2:30
                     </span>
                   </div>
@@ -186,10 +186,10 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                 {/* Period 7 (Afternoon Lab Block) */}
                 <th className="p-2.5 w-52 text-center">
                   <div className="flex flex-col items-center justify-center text-center">
-                    <span className="text-xs font-semibold text-zinc-200">
+                    <span className="text-xs font-semibold text-zinc-300">
                       Period 7 (Lab)
                     </span>
-                    <span className="text-[11px] font-mono tabular-nums text-zinc-400 mt-0.5">
+                    <span className="text-xs text-zinc-400 font-normal tabular-nums mt-0.5">
                       2:30 - 5:00
                     </span>
                   </div>
@@ -206,7 +206,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                   <tr key={day} className="h-28">
                     {/* Day Column (Left): SAT, SUN, MON, TUE, WED */}
                     <td className="w-16 p-2.5 text-center bg-[#0d0e11] select-none border-r border-white/[0.06] align-middle">
-                      <span className="text-sm font-bold font-mono tracking-wider text-zinc-200 block uppercase">
+                      <span className="text-sm font-bold tracking-wider text-zinc-200 block uppercase">
                         {day.slice(0, 3)}
                       </span>
                     </td>
@@ -254,20 +254,19 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                                   : 'border-white/[0.06]'
                               }`}
                             >
-                              {/* Line 1: Course Code */}
-                              <span className="text-sm font-semibold tracking-tight text-white block">
+                              {/* Line 1 (Course Code): Bold 14px, high-contrast */}
+                              <span className="text-white font-semibold text-sm block">
                                 {slot.customCode || 'CLASS'}
                               </span>
 
-                              {/* Line 2: Topic in clean muted text 12px */}
-                              <span className="text-xs font-medium text-zinc-300 mt-0.5 block truncate max-w-full">
+                              {/* Line 2 (Topic): Regular 12px, muted text */}
+                              <span className="text-zinc-300 text-xs mt-0.5 block truncate max-w-full font-normal">
                                 {(slot.customNickname || slot.customCode || '').replace(/^\(|\)$/g, '')}
                               </span>
 
-                              {/* Line 3: Instructor & Room in 11px mono tag */}
-                              <span className="text-[11px] font-mono text-zinc-400 mt-1 block truncate max-w-full">
+                              {/* Line 3 (Teacher): Regular 11px/12px, soft gray (NO room numbers!) */}
+                              <span className="text-zinc-400 text-xs mt-1 block truncate max-w-full font-normal">
                                 {slot.customTeacher || 'TBA'}
-                                {slot.customRoom && ` • ${slot.customRoom.replace(/^Room:\s*/i, '')}`}
                               </span>
                             </div>
                           ) : (
@@ -287,10 +286,10 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                         className="w-14 border-r border-white/[0.06] text-center bg-zinc-950/50 select-none p-2 align-middle"
                       >
                         <div className="h-full min-h-[520px] flex flex-col items-center justify-center gap-4">
-                          <span className="text-[10px] font-mono font-semibold tracking-[0.25em] text-amber-500/80 [writing-mode:vertical-rl] rotate-180 uppercase select-none">
+                          <span className="text-[10px] font-semibold tracking-[0.25em] text-amber-500/80 [writing-mode:vertical-rl] rotate-180 uppercase select-none">
                             PRAYER & LUNCH BREAK
                           </span>
-                          <span className="text-[9px] font-mono text-zinc-400 [writing-mode:vertical-rl] rotate-180 tabular-nums">
+                          <span className="text-xs text-zinc-400 [writing-mode:vertical-rl] rotate-180 tabular-nums">
                             1:30 — 2:30 PM
                           </span>
                         </div>
@@ -311,20 +310,19 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                         >
                           {slot ? (
                             <div className="h-full min-h-[96px] rounded-xl border border-violet-500/30 border-l-[3px] border-l-violet-400 bg-zinc-900/90 hover:border-white/[0.14] transition-all flex flex-col items-center justify-center text-center p-2.5 cursor-pointer relative">
-                              {/* Line 1: Course Code */}
-                              <span className="text-sm font-semibold tracking-tight text-white block">
+                              {/* Line 1 (Course Code): Bold 14px, high-contrast */}
+                              <span className="text-white font-semibold text-sm block">
                                 {slot.customCode || 'LAB'}
                               </span>
 
-                              {/* Line 2: Topic in clean muted text 12px */}
-                              <span className="text-xs font-medium text-zinc-300 mt-0.5 block truncate max-w-full">
+                              {/* Line 2 (Topic): Regular 12px, muted text */}
+                              <span className="text-zinc-300 text-xs mt-0.5 block truncate max-w-full font-normal">
                                 {(slot.customNickname || slot.customCode || '').replace(/^\(|\)$/g, '')}
                               </span>
 
-                              {/* Line 3: Instructor & Room in 11px mono tag */}
-                              <span className="text-[11px] font-mono text-zinc-400 mt-1 block truncate max-w-full">
+                              {/* Line 3 (Teacher): Regular 11px/12px, soft gray (NO room numbers!) */}
+                              <span className="text-zinc-400 text-xs mt-1 block truncate max-w-full font-normal">
                                 {slot.customTeacher || 'Lab Instructors'}
-                                {slot.customRoom && ` • ${slot.customRoom.replace(/^Room:\s*/i, '')}`}
                               </span>
                             </div>
                           ) : (
@@ -355,7 +353,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                 <h3 className="text-xs font-semibold text-zinc-100">
                   {editingCell.existingSlot ? 'Edit Class Slot' : 'Add Class'}
                 </h3>
-                <p className="text-[11px] text-zinc-400 font-mono mt-0.5">
+                <p className="text-[11px] text-zinc-400 mt-0.5">
                   {editingCell.day} • {editingCell.periodId === 7 ? 'Period 7 (Lab)' : `Period ${editingCell.periodId}`}
                 </p>
               </div>
@@ -401,7 +399,7 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                   placeholder="e.g. ME 243 or IPE 205"
                   value={formCode}
                   onChange={(e) => setFormCode(e.target.value.toUpperCase())}
-                  className="w-full bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-1.5 text-zinc-100 font-mono uppercase focus:outline-none focus:border-white/20 transition-colors"
+                  className="w-full bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-1.5 text-zinc-100 uppercase focus:outline-none focus:border-white/20 transition-colors"
                 />
               </div>
 
@@ -450,32 +448,18 @@ export const RoutineDesigner: React.FC<RoutineDesignerProps> = ({
                 </div>
               </div>
 
-              {/* Teacher & Room */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-zinc-400 font-medium mb-1 text-[11px]">
-                    Teacher Initials
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. SA Ma'am"
-                    value={formTeacher}
-                    onChange={(e) => setFormTeacher(e.target.value)}
-                    className="w-full bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-1.5 text-zinc-200 focus:outline-none focus:border-white/20 transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="block text-zinc-400 font-medium mb-1 text-[11px]">
-                    Room / Lab
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Room 317"
-                    value={formRoom}
-                    onChange={(e) => setFormRoom(e.target.value)}
-                    className="w-full bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-1.5 text-zinc-200 focus:outline-none focus:border-white/20 transition-colors"
-                  />
-                </div>
+              {/* Teacher Initials */}
+              <div>
+                <label className="block text-zinc-400 font-medium mb-1 text-[11px]">
+                  Teacher Initials
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. SA Ma'am, Kayes Sir"
+                  value={formTeacher}
+                  onChange={(e) => setFormTeacher(e.target.value)}
+                  className="w-full bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-1.5 text-zinc-200 focus:outline-none focus:border-white/20 transition-colors"
+                />
               </div>
 
               {/* Duration / Span (for morning periods 1-5) */}

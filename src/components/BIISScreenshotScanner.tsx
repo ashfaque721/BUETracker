@@ -304,8 +304,8 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
                 Paste Screenshot or Drop Image
               </h3>
               <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto leading-relaxed">
-                Take a snippet of your BIIS table with <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 border border-white/10 font-mono text-[10px] text-zinc-300">Win + Shift + S</kbd>, then press{' '}
-                <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 border border-white/10 font-mono text-[10px] text-emerald-300 font-bold">Ctrl + V</kbd>!
+                Take a snippet of your BIIS table with <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 border border-white/10 text-[10px] text-zinc-300">Win + Shift + S</kbd>, then press{' '}
+                <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 border border-white/10 text-[10px] text-emerald-300 font-bold">Ctrl + V</kbd>!
               </p>
             </div>
 
@@ -352,7 +352,7 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
                         className="w-full px-2.5 py-1.5 rounded-xl hover:bg-zinc-800 text-zinc-200 text-xs font-medium text-left flex items-center justify-between transition"
                       >
                         <span>{preset.name}</span>
-                        <span className="text-[10px] font-mono text-emerald-400 font-bold">
+                        <span className="text-[10px] text-emerald-400 font-bold">
                           {preset.courses.length} crs
                         </span>
                       </button>
@@ -450,7 +450,7 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-3 font-mono tabular-nums">
+            <div className="flex items-center gap-3 tabular-nums">
               <div className="px-3 py-1 rounded-xl bg-zinc-800 border border-white/10 text-xs">
                 <span className="text-zinc-400 text-[10px] block uppercase">Credits</span>
                 <span className="text-zinc-100 font-bold">{totalCredits.toFixed(2)}</span>
@@ -483,7 +483,7 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
                       type="text"
                       value={c.code}
                       onChange={(e) => handleUpdateCourseField(idx, 'code', e.target.value.toUpperCase())}
-                      className="w-24 px-2 py-1 rounded-lg bg-zinc-800 border border-white/10 text-zinc-100 font-mono font-bold text-xs focus:outline-none focus:border-emerald-500 uppercase"
+                      className="w-24 px-2 py-1 rounded-lg bg-zinc-800 border border-white/10 text-zinc-100 font-bold text-xs focus:outline-none focus:border-emerald-500 uppercase"
                     />
 
                     <input
@@ -496,7 +496,7 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
 
                   <div className="flex items-center gap-2 shrink-0">
                     <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-zinc-500 font-mono">Cr</span>
+                      <span className="text-[10px] text-zinc-500 ">Cr</span>
                       <input
                         type="number"
                         step="0.25"
@@ -504,7 +504,7 @@ export const BIISScreenshotScanner: React.FC<BIISScreenshotScannerProps> = ({
                         max="6"
                         value={c.credits}
                         onChange={(e) => handleUpdateCourseField(idx, 'credits', e.target.value)}
-                        className="w-14 px-1.5 py-1 rounded-lg bg-zinc-800 border border-white/10 text-zinc-100 font-mono text-center text-xs focus:outline-none focus:border-emerald-500"
+                        className="w-14 px-1.5 py-1 rounded-lg bg-zinc-800 border border-white/10 text-zinc-100 text-center text-xs focus:outline-none focus:border-emerald-500"
                       />
                     </div>
 

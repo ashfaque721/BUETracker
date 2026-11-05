@@ -7,6 +7,7 @@ import {
 } from '../types';
 import { convertParsedCourseToAppCourse, ParsedBIISCourse } from '../utils/biisParser';
 import { BIISScreenshotScanner } from './BIISScreenshotScanner';
+import { SEED_COURSES, SEED_ROUTINE } from '../db';
 import {
   GraduationCap,
   Calendar,
@@ -180,17 +181,18 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
         ];
       }
     } else {
-      // Non-freshman: Ingest courses detected from Screenshot OCR or Preset
+      // Non-freshman: Ingest courses detected from Screenshot OCR or Quick CGPA
+      let prevCourses: Course[] = [];
       if (confirmedCourses.length > 0) {
         const targetPrevSemId = previousSemesters[previousSemesters.length - 1]?.id || 'L1T1';
-        initialCourses = confirmedCourses.map((parsed) =>
+        prevCourses = confirmedCourses.map((parsed) =>
           convertParsedCourseToAppCourse(parsed, targetPrevSemId, false)
         );
       } else if (ingestMethod === 'quick_gpa') {
         const targetPrevSemId = previousSemesters[previousSemesters.length - 1]?.id || 'L1T1';
         const parsedGpa = parseFloat(quickCgpa) || 3.75;
         const parsedCredits = parseFloat(quickCredits) || 38.0;
-        initialCourses = [
+        prevCourses = [
           {
             id: `course_prev_summary_${Date.now()}`,
             code: 'PREV 001',
@@ -206,14 +208,87 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
           },
         ];
       }
+
+      // Populate current ongoing semester courses so Routine Designer and Assessment Engine are immediately usable
+      let currentOngoingCourses: Course[] = [];
+      if (selectedSemesterId === 'L2T1') {
+        currentOngoingCourses = SEED_COURSES.filter((c) => c.semesterId === 'L2T1').map((c) => ({
+          ...c,
+          id: `c_curr_${c.code.replace(/\s+/g, '_')}_${Date.now()}`,
+          isOngoing: true,
+        }));
+      } else if (selectedSemesterId === 'L1T2') {
+        currentOngoingCourses = SEED_COURSES.filter((c) => c.semesterId === 'L1T2').map((c) => ({
+          ...c,
+          id: `c_curr_${c.code.replace(/\s+/g, '_')}_${Date.now()}`,
+          isOngoing: true,
+        }));
+      } else {
+        // Standard ongoing starter courses for other semesters
+        currentOngoingCourses = [
+          {
+            id: `c_${selectedSemesterId}_1_${Date.now()}`,
+            code: 'DEPT 201',
+            title: `${resolvedDept} Core Theory I`,
+            nickname: 'Core Theory I',
+            credits: 3.0,
+            type: 'theory',
+            semesterId: selectedSemesterId,
+            color: '#3b82f6',
+            isOngoing: true,
+            attendance: { totalConducted: 0, attended: 0 },
+            classTests: [],
+          },
+          {
+            id: `c_${selectedSemesterId}_2_${Date.now()}`,
+            code: 'DEPT 203',
+            title: `${resolvedDept} Core Theory II`,
+            nickname: 'Core Theory II',
+            credits: 3.0,
+            type: 'theory',
+            semesterId: selectedSemesterId,
+            color: '#8b5cf6',
+            isOngoing: true,
+            attendance: { totalConducted: 0, attended: 0 },
+            classTests: [],
+          },
+          {
+            id: `c_${selectedSemesterId}_3_${Date.now()}`,
+            code: 'DEPT 202',
+            title: `${resolvedDept} Sessional Lab`,
+            nickname: 'Core Lab',
+            credits: 1.5,
+            type: 'sessional',
+            semesterId: selectedSemesterId,
+            color: '#10b981',
+            isOngoing: true,
+            projectedGradePoint: 4.0,
+          },
+        ];
+      }
+
+      initialCourses = [...prevCourses, ...currentOngoingCourses];
     }
+
+    const defaultSlots =
+      selectedSemesterId === 'L2T1'
+        ? SEED_ROUTINE.slots
+        : isFreshmanL1T1 && l1t1Template === 'standard'
+        ? [
+            { id: 's1', day: 'Saturday' as const, periodId: 1, span: 1, courseId: initialCourses[0]?.id, customCode: 'MATH 191', customTeacher: 'SA Sir' },
+            { id: 's2', day: 'Saturday' as const, periodId: 2, span: 1, courseId: initialCourses[1]?.id, customCode: 'PHY 109', customTeacher: 'MA Sir' },
+            { id: 's3', day: 'Sunday' as const, periodId: 1, span: 1, courseId: initialCourses[2]?.id, customCode: 'CHEM 109', customTeacher: 'FK Sir' },
+            { id: 's4', day: 'Monday' as const, periodId: 1, span: 1, courseId: initialCourses[3]?.id, customCode: 'HUM 101', customTeacher: 'RH Sir' },
+            { id: 's5', day: 'Tuesday' as const, periodId: 7, span: 1, courseId: initialCourses[4]?.id, customCode: 'ME 160', customTeacher: 'Drawing Lab' },
+          ]
+        : [];
 
     const initialRoutine: RoutineMetadata = {
       id: `routine_${Date.now()}`,
-      title: routineTitle.trim() || `Class Routine of ${selectedSemester.label}`,
+      title: routineTitle.trim() || `Class Routine — ${selectedSemester.shortLabel}`,
       subTitle: `${selectedSemester.label} | ${resolvedDept}`,
       effectiveDate: 'November 2026',
-      slots: [],
+      slots: defaultSlots,
     };
 
     try {
@@ -239,7 +314,7 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
             <div>
               <h1 className="text-base sm:text-lg font-semibold tracking-tight text-zinc-100 flex items-center gap-2">
                 <span>Welcome to BUETracker</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/60 font-bold uppercase tracking-wider">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/60 font-bold uppercase tracking-wider">
                   Setup
                 </span>
               </h1>
@@ -249,7 +324,7 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 font-mono text-xs text-zinc-400">
+          <div className="flex items-center gap-1.5 text-xs text-zinc-400">
             <span className={`w-2.5 h-2.5 rounded-full ${step === 1 ? 'bg-emerald-500' : 'bg-zinc-700'}`} />
             <span className={`w-2.5 h-2.5 rounded-full ${step === 2 ? 'bg-emerald-500' : 'bg-zinc-700'}`} />
           </div>
@@ -290,7 +365,7 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
                   placeholder="e.g. 2308001 or 2405015"
                   value={studentId}
                   onChange={(e) => setStudentId(e.target.value)}
-                  className="w-full bg-zinc-900 border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 font-mono tabular-nums focus:outline-none focus:border-emerald-500 transition font-medium"
+                  className="w-full bg-zinc-900 border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 tabular-nums focus:outline-none focus:border-emerald-500 transition font-medium"
                 />
               </div>
             </div>
@@ -565,7 +640,7 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
                       max="4.00"
                       value={quickCgpa}
                       onChange={(e) => setQuickCgpa(e.target.value)}
-                      className="w-full bg-zinc-800 border border-white/[0.08] rounded-xl px-3 py-2 text-zinc-100 font-mono tabular-nums focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-zinc-800 border border-white/[0.08] rounded-xl px-3 py-2 text-zinc-100 tabular-nums focus:outline-none focus:border-emerald-500"
                     />
                   </div>
 
@@ -578,7 +653,7 @@ export const StudentSetupWizard: React.FC<StudentSetupWizardProps> = ({
                       step="0.5"
                       value={quickCredits}
                       onChange={(e) => setQuickCredits(e.target.value)}
-                      className="w-full bg-zinc-800 border border-white/[0.08] rounded-xl px-3 py-2 text-zinc-100 font-mono tabular-nums focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-zinc-800 border border-white/[0.08] rounded-xl px-3 py-2 text-zinc-100 tabular-nums focus:outline-none focus:border-emerald-500"
                     />
                   </div>
                 </div>
