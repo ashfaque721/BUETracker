@@ -45,6 +45,8 @@ export interface ClassTest {
 export interface AttendanceRecord {
   attended: number;
   conducted: number;
+  totalConducted?: number;
+  history?: ('attended' | 'missed')[];
 }
 
 export interface Course {
@@ -127,6 +129,8 @@ export interface SemesterStoreActions {
   setCourses: React.Dispatch<React.SetStateAction<Course[]>>;
   setRoutineSlots: React.Dispatch<React.SetStateAction<RoutineSlot[]>>;
   addAttendance: (courseCode: string, isAttended: boolean) => void;
+  undoAttendance: (courseCode: string) => void;
+  setAttendance: (courseCode: string, attended: number, conducted: number) => void;
   addOrUpdateCT: (courseCode: string, ctIndex: number, score: number, outOf: number) => void;
   assignRoutineSlot: (
     day: DayOfWeek | string,

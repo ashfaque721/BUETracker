@@ -150,19 +150,106 @@ export function useSemesterStore(initialTermId: TermId = 'L-2 T-1'): SemesterSto
   // 3. Mutation Handlers
 
   /**
-   * Updates attendance record for a course
-   * Increments totalConducted by 1, and attended by 1 if isAttended is true.
+   * Updates attendance record for a course adhering strictly to BUET academic ordinance:
+   * - Max 13 teaching weeks per semester
+   * - An n-credit course conducts n classes per week -> maxSemesterClasses = Math.round(credits * 13)
+   * - Increments conducted by 1 (capped at maxSemesterClasses)
+   * - Increments attended by 1 if isAttended is true (capped at conducted)
    */
   const addAttendance = useCallback((courseCode: string, isAttended: boolean) => {
     setCourses((prevCourses) =>
       prevCourses.map((c) => {
         if (c.code === courseCode) {
+          const credits = c.credits || 3.0;
+          const maxClasses = Math.max(1, Math.round(credits * 13));
           const currentAtt = c.attendance || { attended: 0, conducted: 0 };
+
+          // Strictly cap at BUET 13-week semester maximum
+          if (currentAtt.conducted >= maxClasses) {
+            return c;
+          }
+
+          const nextConducted = currentAtt.conducted + 1;
+          const nextAttended = Math.min(nextConducted, currentAtt.attended + (isAttended ? 1 : 0));
+          const nextHistory = [...(currentAtt.history || []), (isAttended ? 'attended' : 'missed') as 'attended' | 'missed'];
+
           return {
             ...c,
             attendance: {
-              conducted: currentAtt.conducted + 1,
-              attended: currentAtt.attended + (isAttended ? 1 : 0),
+              conducted: nextConducted,
+              attended: nextAttended,
+              history: nextHistory,
+            },
+          };
+        }
+        return c;
+      })
+    );
+  }, []);
+
+  /**
+   * Reverts the most recent attendance increment for a course
+   */
+  const undoAttendance = useCallback((courseCode: string) => {
+    setCourses((prevCourses) =>
+      prevCourses.map((c) => {
+        if (c.code === courseCode) {
+          const currentAtt = c.attendance;
+          if (!currentAtt || currentAtt.conducted <= 0) {
+            return c;
+          }
+
+          if (currentAtt.history && currentAtt.history.length > 0) {
+            const lastAction = currentAtt.history[currentAtt.history.length - 1];
+            const nextHistory = currentAtt.history.slice(0, -1);
+            const nextAttended = lastAction === 'attended' ? Math.max(0, currentAtt.attended - 1) : currentAtt.attended;
+            const nextConducted = Math.max(0, currentAtt.conducted - 1);
+
+            return {
+              ...c,
+              attendance: {
+                conducted: nextConducted,
+                attended: Math.min(nextConducted, nextAttended),
+                history: nextHistory,
+              },
+            };
+          }
+
+          // Fallback if no history recorded yet
+          const nextConducted = Math.max(0, currentAtt.conducted - 1);
+          const nextAttended = Math.min(nextConducted, currentAtt.attended);
+          return {
+            ...c,
+            attendance: {
+              conducted: nextConducted,
+              attended: nextAttended,
+              history: [],
+            },
+          };
+        }
+        return c;
+      })
+    );
+  }, []);
+
+  /**
+   * Directly sets attendance counts with BUET 13-week limit validation
+   */
+  const setAttendance = useCallback((courseCode: string, attended: number, conducted: number) => {
+    setCourses((prevCourses) =>
+      prevCourses.map((c) => {
+        if (c.code === courseCode) {
+          const credits = c.credits || 3.0;
+          const maxClasses = Math.max(1, Math.round(credits * 13));
+          const safeConducted = Math.min(maxClasses, Math.max(0, Math.round(conducted)));
+          const safeAttended = Math.min(safeConducted, Math.max(0, Math.round(attended)));
+
+          return {
+            ...c,
+            attendance: {
+              conducted: safeConducted,
+              attended: safeAttended,
+              history: [],
             },
           };
         }
@@ -526,6 +613,8 @@ export function useSemesterStore(initialTermId: TermId = 'L-2 T-1'): SemesterSto
     setCourses,
     setRoutineSlots,
     addAttendance,
+    undoAttendance,
+    setAttendance,
     addOrUpdateCT,
     assignRoutineSlot,
     removeRoutineSlot,

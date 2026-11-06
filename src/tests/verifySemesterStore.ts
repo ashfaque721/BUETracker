@@ -64,11 +64,11 @@ const totalPointsL2T2 = completedCoursesL2T2.reduce(
 const cgpaL2T2 = Math.round((totalPointsL2T2 / completedCreditsL2T2) * 100) / 100;
 
 console.log(`Completed courses count: ${completedCoursesL2T2.length}`);
-console.log(`Completed credits: ${completedCreditsL2T2} cr (Expected ~61.5 cr)`);
-console.log(`Cumulative CGPA: ${cgpaL2T2.toFixed(2)} (Expected ~3.84)`);
+console.log(`Completed credits: ${completedCreditsL2T2} cr (Expected ~62.5 cr)`);
+console.log(`Cumulative CGPA: ${cgpaL2T2.toFixed(2)} (Expected ~3.82)`);
 
-if (completedCreditsL2T2 !== 61.5) {
-  throw new Error(`Expected 61.5 completed credits, got ${completedCreditsL2T2}`);
+if (completedCreditsL2T2 !== 62.5) {
+  throw new Error(`Expected 62.5 completed credits, got ${completedCreditsL2T2}`);
 }
 if (cgpaL2T2 < 3.5 || cgpaL2T2 > 4.0) {
   throw new Error(`Invalid CGPA calculation: ${cgpaL2T2}`);

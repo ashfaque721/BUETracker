@@ -9,6 +9,8 @@ import {
   Info,
   X,
   Check,
+  RotateCcw,
+  Edit3,
 } from 'lucide-react';
 
 export interface AssessmentViewProps {
@@ -50,6 +52,8 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({ store: propStore
   const {
     currentTheoryCourses,
     addAttendance,
+    undoAttendance,
+    setAttendance,
     addOrUpdateCT,
     setCourses,
   } = store;
@@ -63,6 +67,12 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({ store: propStore
   const [selectedTargetGrade, setSelectedTargetGrade] = useState<string>('A+');
   const [showAllThresholds, setShowAllThresholds] = useState<boolean>(false);
   const [showSlabsModal, setShowSlabsModal] = useState<boolean>(false);
+
+  // Direct Attendance Edit State
+  const [isEditingAttendance, setIsEditingAttendance] = useState<boolean>(false);
+  const [editAttendedInput, setEditAttendedInput] = useState<string>('');
+  const [editConductedInput, setEditConductedInput] = useState<string>('');
+  const [attError, setAttError] = useState<string>('');
 
   // New / Edit Class Test Form State
   const [isAddingCT, setIsAddingCT] = useState<boolean>(false);
@@ -113,11 +123,25 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({ store: propStore
   const attendanceMarksObtained = (slabPoints / 10) * maxAttendanceMarks; // = slabPoints * credits
   const isNonCollegiate = attendancePercentage < 60;
 
+  // BUET Academic Ordinance: Max 13 teaching weeks per term; n credits = n lecture classes per week
+  const maxSemesterClasses = Math.max(1, Math.round(courseCredits * 13));
+  const isMaxClassesReached = conductedCount >= maxSemesterClasses;
+  const remainingClasses = Math.max(0, maxSemesterClasses - conductedCount);
+
   // Safe bunks to maintain 60% collegiate standing
   const safeBunksTo60 = useMemo(() => {
     if (conductedCount === 0 || attendancePercentage < 60) return 0;
-    return Math.max(0, Math.floor(attendedCount / 0.6 - conductedCount));
-  }, [attendedCount, conductedCount, attendancePercentage]);
+    return Math.min(
+      remainingClasses,
+      Math.max(0, Math.floor(attendedCount / 0.6 - conductedCount))
+    );
+  }, [attendedCount, conductedCount, attendancePercentage, remainingClasses]);
+
+  // Total safe bunks remaining across the full 13-week semester
+  const minRequiredForSemester60 = Math.ceil(0.60 * maxSemesterClasses);
+  const maxSemesterAllowedMisses = Math.max(0, maxSemesterClasses - minRequiredForSemester60);
+  const missedSoFar = Math.max(0, conductedCount - attendedCount);
+  const semesterSafeBunksRemaining = Math.max(0, maxSemesterAllowedMisses - missedSoFar);
 
   // 2. Class Test (CT) Metrics
   const classTests = useMemo(() => {
@@ -182,13 +206,55 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({ store: propStore
   // Action Handlers Connected to Real State
   // ---------------------------------------------------------------------------
   const handleAttended = () => {
-    if (!activeCourse) return;
+    if (!activeCourse || isMaxClassesReached) return;
     addAttendance(activeCourse.code, true);
   };
 
   const handleMissed = () => {
-    if (!activeCourse) return;
+    if (!activeCourse || isMaxClassesReached) return;
     addAttendance(activeCourse.code, false);
+  };
+
+  const handleUndoAttendance = () => {
+    if (!activeCourse || conductedCount <= 0) return;
+    undoAttendance(activeCourse.code);
+  };
+
+  const handleOpenEditAttendance = () => {
+    if (!activeCourse) return;
+    setEditAttendedInput(String(attendedCount));
+    setEditConductedInput(String(conductedCount));
+    setAttError('');
+    setIsEditingAttendance(true);
+  };
+
+  const handleSaveAttendance = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeCourse) return;
+    const attNum = parseInt(editAttendedInput, 10);
+    const condNum = parseInt(editConductedInput, 10);
+
+    if (isNaN(attNum) || attNum < 0) {
+      setAttError('Attended classes must be a non-negative number.');
+      return;
+    }
+    if (isNaN(condNum) || condNum < 0) {
+      setAttError('Conducted classes must be a non-negative number.');
+      return;
+    }
+    if (condNum > maxSemesterClasses) {
+      setAttError(
+        `Conducted classes cannot exceed ${maxSemesterClasses} (13 weeks × ${courseCredits} credits in BUET).`
+      );
+      return;
+    }
+    if (attNum > condNum) {
+      setAttError('Attended classes cannot exceed conducted classes.');
+      return;
+    }
+
+    setAttendance(activeCourse.code, attNum, condNum);
+    setIsEditingAttendance(false);
   };
 
   const handleOpenAddCT = () => {
@@ -304,8 +370,20 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({ store: propStore
           {/* A. Minimalist Attendance Section (10% Weight) */}
           <div className="bg-[#121316] border border-white/[0.06] rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-white">Attendance</h3>
-              <span className="text-xs text-zinc-400 tabular-nums">10% Weight</span>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-medium text-white">Attendance</h3>
+                <span className="text-[11px] text-zinc-500 font-mono">
+                  ({courseCredits} cr • {courseCredits} cls/wk • max {maxSemesterClasses})
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSlabsModal(true)}
+                className="text-xs text-zinc-400 hover:text-zinc-200 tabular-nums flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                10% Weight
+                <Info className="w-3 h-3 text-zinc-500" />
+              </button>
             </div>
 
             <div>
@@ -313,7 +391,10 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({ store: propStore
                 {attendancePercentage.toFixed(1)}%
               </div>
               <p className="text-xs text-zinc-400 mt-1 tabular-nums">
-                {slabPoints} / 10 marks • {safeBunksTo60} safe bunks available
+                {slabPoints} / 10 marks • {safeBunksTo60} safe bunks available{' '}
+                <span className="text-zinc-500">
+                  ({remainingClasses} classes remaining in 13-wk term)
+                </span>
               </p>
             </div>
 
@@ -338,28 +419,81 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({ store: propStore
               </p>
             )}
 
-            {/* Tactile + Attended and + Missed Buttons */}
+            {isMaxClassesReached && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900 border border-white/[0.08] text-xs text-zinc-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                <span>
+                  13-week limit reached ({maxSemesterClasses}/{maxSemesterClasses} classes for {courseCredits} cr)
+                </span>
+              </div>
+            )}
+
+            {/* Tactile + Attended, + Missed, Undo, and Edit Buttons */}
             <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={handleAttended}
-                  className="px-3.5 py-1.5 text-xs font-medium rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-100 transition-colors cursor-pointer border border-white/[0.08]"
+                  disabled={isMaxClassesReached}
+                  title={
+                    isMaxClassesReached
+                      ? `BUET 13-week limit reached (${maxSemesterClasses} classes max)`
+                      : 'Record Attended Class'
+                  }
+                  className={`px-3.5 py-1.5 text-xs font-medium rounded-md transition-colors border ${
+                    isMaxClassesReached
+                      ? 'bg-zinc-900 text-zinc-600 border-white/[0.04] cursor-not-allowed opacity-50'
+                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border-white/[0.08] cursor-pointer'
+                  }`}
                 >
                   + Attended
                 </button>
                 <button
                   type="button"
                   onClick={handleMissed}
-                  className="px-3.5 py-1.5 text-xs font-medium rounded-md bg-zinc-800/60 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer border border-white/[0.04]"
+                  disabled={isMaxClassesReached}
+                  title={
+                    isMaxClassesReached
+                      ? `BUET 13-week limit reached (${maxSemesterClasses} classes max)`
+                      : 'Record Missed Class'
+                  }
+                  className={`px-3.5 py-1.5 text-xs font-medium rounded-md transition-colors border ${
+                    isMaxClassesReached
+                      ? 'bg-zinc-900 text-zinc-600 border-white/[0.04] cursor-not-allowed opacity-50'
+                      : 'bg-zinc-800/60 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 border-white/[0.04] cursor-pointer'
+                  }`}
                 >
                   + Missed
                 </button>
+                {conductedCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleUndoAttendance}
+                    title="Undo last recorded attendance"
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md bg-zinc-800/40 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors border border-white/[0.04] cursor-pointer"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Undo</span>
+                  </button>
+                )}
               </div>
 
-              <span className="text-xs text-zinc-400 tabular-nums">
-                {attendedCount} / {conductedCount} classes
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-zinc-400 tabular-nums">
+                  {attendedCount} / {conductedCount} classes
+                  <span className="text-zinc-500 text-[11px] ml-1">
+                    (max {maxSemesterClasses})
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleOpenEditAttendance}
+                  title="Directly edit attendance counts"
+                  className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors cursor-pointer"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -656,6 +790,88 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({ store: propStore
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Direct Attendance Edit Modal */}
+      {isEditingAttendance && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="w-full max-w-sm bg-[#14151a] border border-white/[0.08] rounded-2xl shadow-2xl p-5 space-y-4 animate-modal-in text-xs">
+            <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+              <div>
+                <h3 className="font-semibold text-white text-sm">Edit Attendance</h3>
+                <p className="text-zinc-400 text-[11px] mt-0.5">
+                  {activeCourse.code} • BUET 13-Wk Max: {maxSemesterClasses} classes ({courseCredits} cr)
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditingAttendance(false)}
+                className="text-zinc-400 hover:text-zinc-200 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAttendance} className="space-y-4">
+              {attError && (
+                <div className="p-2 rounded bg-red-900/30 border border-red-500/30 text-red-400 text-[11px]">
+                  {attError}
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="text-zinc-400 font-medium">Attended Classes</label>
+                <input
+                  type="number"
+                  min="0"
+                  max={maxSemesterClasses}
+                  value={editAttendedInput}
+                  onChange={(e) => setEditAttendedInput(e.target.value)}
+                  className="w-full bg-[#1c1d22] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 tabular-nums"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-zinc-400 font-medium">Conducted Classes</label>
+                  <span className="text-[11px] text-zinc-500 font-mono">
+                    Limit: {maxSemesterClasses}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  max={maxSemesterClasses}
+                  value={editConductedInput}
+                  onChange={(e) => setEditConductedInput(e.target.value)}
+                  className="w-full bg-[#1c1d22] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 tabular-nums"
+                  required
+                />
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-white/[0.04] text-[11px] text-zinc-400 leading-relaxed">
+                <span className="text-zinc-300 font-medium">BUET Ordinance Rule:</span> A semester has a maximum of 13 teaching weeks. Each credit hour has 1 lecture per week ({courseCredits} classes/week × 13 weeks = {maxSemesterClasses} classes max).
+              </div>
+
+              <div className="pt-2 border-t border-white/[0.06] flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingAttendance(false)}
+                  className="px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition-colors cursor-pointer"
+                >
+                  Save Attendance
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

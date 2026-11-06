@@ -33,7 +33,9 @@ export interface ClassTest {
 
 export interface AttendanceRecord {
   totalConducted: number;
+  conducted?: number;
   attended: number;
+  history?: ('attended' | 'missed')[];
 }
 
 export interface Course {

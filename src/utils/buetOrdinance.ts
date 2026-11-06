@@ -14,17 +14,39 @@ export interface AttendanceAnalysis {
   isNonCollegiate: boolean;
   safeBunksCurrentSlab: number;
   safeBunksTo60: number;
+  semesterSafeBunksTo60: number;
+  maxSemesterClasses: number;
+  remainingClasses: number;
+  isMaxClassesReached: boolean;
   classesNeededForNextSlab: number | null;
   nextSlabTargetPercent: number | null;
   status: 'safe' | 'warning' | 'danger';
 }
 
-export function calculateAttendance(credits: number, conducted: number, attended: number): AttendanceAnalysis {
-  const safeConducted = Math.max(0, conducted);
+/**
+ * BUET Academic Ordinance Attendance Calculator
+ * 
+ * Rules:
+ * - A semester has maximum 13 teaching weeks.
+ * - An n-credit course conducts n lecture classes per week.
+ * - maxSemesterClasses = Math.round(credits * 13)
+ * - conducted classes cannot exceed maxSemesterClasses.
+ */
+export function calculateAttendance(
+  credits: number,
+  conducted: number,
+  attended: number,
+  customMaxClasses?: number
+): AttendanceAnalysis {
+  const cr = credits > 0 ? credits : 3.0;
+  const maxSemesterClasses = customMaxClasses ?? Math.max(1, Math.round(cr * 13));
+  const safeConducted = Math.min(maxSemesterClasses, Math.max(0, conducted));
   const safeAttended = Math.min(safeConducted, Math.max(0, attended));
+  const remainingClasses = Math.max(0, maxSemesterClasses - safeConducted);
+  const isMaxClassesReached = safeConducted >= maxSemesterClasses;
   
   const percentage = safeConducted === 0 ? 100 : (safeAttended / safeConducted) * 100;
-  const maxAttendanceMarks = credits * 10;
+  const maxAttendanceMarks = cr * 10;
 
   // Find slab
   let slab = BUET_ATTENDANCE_SLABS.find(
@@ -39,11 +61,17 @@ export function calculateAttendance(credits: number, conducted: number, attended
   const attendanceMarks = (slabPoints / 10) * maxAttendanceMarks; // = slabPoints * credits
   const isNonCollegiate = percentage < 60;
 
-  // Safe bunks to maintain 60% (Non-collegiate limit)
+  // Safe bunks to maintain 60% with classes conducted so far
   let safeBunksTo60 = 0;
   if (safeConducted > 0 && percentage >= 60) {
     safeBunksTo60 = Math.max(0, Math.floor(safeAttended / 0.60 - safeConducted));
   }
+
+  // Full semester safe bunks remaining across 13 weeks (total allowed misses = maxClasses - ceil(0.60 * maxClasses))
+  const minRequiredForSemester60 = Math.ceil(0.60 * maxSemesterClasses);
+  const maxSemesterAllowedMisses = Math.max(0, maxSemesterClasses - minRequiredForSemester60);
+  const missedSoFar = safeConducted - safeAttended;
+  const semesterSafeBunksTo60 = Math.max(0, maxSemesterAllowedMisses - missedSoFar);
 
   // Safe bunks to maintain current slab minimum
   let safeBunksCurrentSlab = 0;
@@ -56,7 +84,7 @@ export function calculateAttendance(credits: number, conducted: number, attended
   let classesNeededForNextSlab: number | null = null;
   let nextSlabTargetPercent: number | null = null;
 
-  if (percentage < 90) {
+  if (percentage < 90 && remainingClasses > 0) {
     const higherSlabs = BUET_ATTENDANCE_SLABS.filter((s) => s.minPercent > percentage).sort(
       (a, b) => a.minPercent - b.minPercent
     );
@@ -85,6 +113,10 @@ export function calculateAttendance(credits: number, conducted: number, attended
     isNonCollegiate,
     safeBunksCurrentSlab,
     safeBunksTo60,
+    semesterSafeBunksTo60,
+    maxSemesterClasses,
+    remainingClasses,
+    isMaxClassesReached,
     classesNeededForNextSlab,
     nextSlabTargetPercent,
     status: slab.status,
@@ -210,7 +242,7 @@ export function evaluateCourseAssessment(course: Course): ContinuousAssessmentSu
   const credits = course.credits || 3.0;
   const attendance = calculateAttendance(
     credits,
-    course.attendance?.totalConducted || 0,
+    course.attendance?.conducted ?? course.attendance?.totalConducted ?? 0,
     course.attendance?.attended || 0
   );
 
